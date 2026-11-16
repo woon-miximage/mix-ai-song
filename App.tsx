@@ -265,6 +265,34 @@ const App: React.FC = () => {
     };
   }, []);
 
+  const handleSelectAiEngine = (engine: AiEngineId) => {
+    setSelectedAiEngine(engine);
+    setDraftAiEngine(engine);
+    try {
+      localStorage.setItem('mix_ai_engine', engine);
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  const handleDeepseekKeyChange = (val: string) => {
+    setDeepseekApiKey(val);
+    try {
+      localStorage.setItem('mix_deepseek_api_key', val.trim());
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  const handleGeminiKeyChange = (val: string) => {
+    setGeminiApiKey(val);
+    try {
+      localStorage.setItem('mix_gemini_api_key', val.trim());
+    } catch {
+      // ignore storage errors
+    }
+  };
+
   const handleSaveAiEngine = () => {
     setSelectedAiEngine(draftAiEngine);
     try {
@@ -280,7 +308,7 @@ const App: React.FC = () => {
     const keyDetail = draftAiEngine === 'deepseek-v4-pro'
       ? (deepseekApiKey.trim() ? 'พร้อมคีย์ DeepSeek ส่วนตัว' : 'ใช้คีย์ระบบ')
       : (geminiApiKey.trim() ? 'พร้อมคีย์ Gemini ส่วนตัว' : 'ใช้คีย์ระบบ');
-    setAiEngineSavedNotice(`บันทึก ${label} • ${keyDetail} เรียบร้อย`);
+    setAiEngineSavedNotice(`✓ บันทึก ${label} • ${keyDetail} เรียบร้อย พร้อมใช้งานทันที`);
     setTimeout(() => {
       setAiEngineSavedNotice(null);
     }, 3500);
@@ -616,7 +644,11 @@ const App: React.FC = () => {
         id: item.id,
         title: item.title,
         genre: item.input.genre,
-        duration: item.input.length === '2-3 min' ? '02:48' : item.input.length === '4-5 min' ? '04:12' : '03:28',
+        duration: item.input.length === '1:30 min' ? '01:30'
+          : item.input.length === '2:30 min' || item.input.length === '2-3 min' ? '02:30'
+          : item.input.length === '4:30 min' || item.input.length === '4-5 min' ? '04:30'
+          : item.input.length === '6:00 min' ? '06:00'
+          : '03:30',
         rawItem: item as GeneratedLyric | undefined
       }))
     : SAMPLE_RECENT_SONGS.map(s => ({ ...s, rawItem: undefined as GeneratedLyric | undefined }));
@@ -930,7 +962,7 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setDraftAiEngine('deepseek-v4-pro')}
+                    onClick={() => handleSelectAiEngine('deepseek-v4-pro')}
                     className={`p-2 rounded-xl border text-left transition cursor-pointer ${
                       draftAiEngine === 'deepseek-v4-pro'
                         ? 'bg-[#111111] text-white border-[#111111] shadow-xs'
@@ -965,7 +997,7 @@ const App: React.FC = () => {
 
                   <button
                     type="button"
-                    onClick={() => setDraftAiEngine('gemini-3.8-flash')}
+                    onClick={() => handleSelectAiEngine('gemini-3.8-flash')}
                     className={`p-2 rounded-xl border text-left transition cursor-pointer ${
                       draftAiEngine === 'gemini-3.8-flash'
                         ? 'bg-[#111111] text-white border-[#111111] shadow-xs'
@@ -1016,7 +1048,7 @@ const App: React.FC = () => {
                         <input
                           type={showDeepseekKey ? 'text' : 'password'}
                           value={deepseekApiKey}
-                          onChange={(e) => setDeepseekApiKey(e.target.value)}
+                          onChange={(e) => handleDeepseekKeyChange(e.target.value)}
                           placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
                           className="w-full bg-[#F8F8F8] border border-[#E0E0E0] focus:border-[#111111] focus:bg-white text-[11px] font-mono rounded-lg pl-2.5 pr-8 py-1.5 outline-none transition"
                         />
@@ -1054,7 +1086,7 @@ const App: React.FC = () => {
                         <input
                           type={showGeminiKey ? 'text' : 'password'}
                           value={geminiApiKey}
-                          onChange={(e) => setGeminiApiKey(e.target.value)}
+                          onChange={(e) => handleGeminiKeyChange(e.target.value)}
                           placeholder="AIzaSyxxxxxxxxxxxxxxxxxxxx"
                           className="w-full bg-[#F8F8F8] border border-[#E0E0E0] focus:border-[#111111] focus:bg-white text-[11px] font-mono rounded-lg pl-2.5 pr-8 py-1.5 outline-none transition"
                         />
@@ -1099,7 +1131,7 @@ const App: React.FC = () => {
                           <input
                             type={draftAiEngine === 'deepseek-v4-pro' ? (showGeminiKey ? 'text' : 'password') : (showDeepseekKey ? 'text' : 'password')}
                             value={draftAiEngine === 'deepseek-v4-pro' ? geminiApiKey : deepseekApiKey}
-                            onChange={(e) => draftAiEngine === 'deepseek-v4-pro' ? setGeminiApiKey(e.target.value) : setDeepseekApiKey(e.target.value)}
+                            onChange={(e) => draftAiEngine === 'deepseek-v4-pro' ? handleGeminiKeyChange(e.target.value) : handleDeepseekKeyChange(e.target.value)}
                             placeholder={draftAiEngine === 'deepseek-v4-pro' ? 'AIzaSyxxxxxxxxxxxxxxxxxxxx' : 'sk-xxxxxxxxxxxxxxxxxxxxxxxx'}
                             className="w-full bg-[#F8F8F8] border border-[#E0E0E0] focus:border-[#111111] focus:bg-white text-[10px] font-mono rounded-lg pl-2 pr-7 py-1 outline-none transition"
                           />
@@ -1364,7 +1396,7 @@ const App: React.FC = () => {
             />
 
             {state.error && (
-              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-700 font-semibold">
+              <div className="mt-3 p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-700 font-semibold whitespace-pre-line leading-relaxed shadow-xs">
                 ⚠️ {state.error}
               </div>
             )}

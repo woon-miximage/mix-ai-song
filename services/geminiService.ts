@@ -63,26 +63,56 @@ async function postJsonWithWarmupRetry(url: string, payload: unknown, maxRetries
 }
 
 async function callGeminiDirect(promptText: string, apiKey: string): Promise<string> {
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  // Use resilient model tier ordering with 503 retry backoff
+  const models = [
+    { name: 'gemini-flash-lite-latest', timeout: 35000 },
+    { name: 'gemini-3.5-flash', timeout: 45000 },
+    { name: 'gemini-3.8-flash', timeout: 45000 },
+    { name: 'gemini-3.1-flash-lite', timeout: 35000 }
+  ];
+
   let lastErr: any = null;
-  for (const model of models) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }],
-          generationConfig: { responseMimeType: 'application/json' },
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (text) return text;
+  for (const m of models) {
+    for (let attempt = 0; attempt <= 1; attempt++) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${m.name}:generateContent?key=${apiKey.trim()}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              maxOutputTokens: 8192,
+            },
+          }),
+          signal: AbortSignal.timeout(m.timeout),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (text) return text;
+        } else {
+          const errJson = await res.json().catch(() => ({}));
+          const errMsg = errJson?.error?.message || res.statusText;
+          if (res.status === 503 && attempt === 0) {
+            console.warn(`[GeminiDirect] Model ${m.name} got 503, retrying in 1.2s...`);
+            await new Promise((r) => setTimeout(r, 1200));
+            continue;
+          }
+          console.warn(`[GeminiDirect] Model ${m.name} returned ${res.status}:`, errMsg);
+          lastErr = new Error(`Gemini ${m.name} (${res.status}): ${errMsg}`);
+        }
+      } catch (e: any) {
+        console.warn(`[GeminiDirect] Model ${m.name} attempt failed (${e?.message || e})`);
+        lastErr = e;
+        if (attempt === 0) {
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
       }
-    } catch (e) {
-      lastErr = e;
+      break;
     }
   }
   throw lastErr || new Error('ไม่สามารถเชื่อมต่อ Gemini API ได้ กรุณาตรวจสอบ API Key');
@@ -94,50 +124,101 @@ async function generateDirectFromBrowser(
   deepseekKey?: string,
   geminiKey?: string
 ): Promise<{ text: string; engineUsed: string; fallbackApplied: boolean; fallbackReason?: string }> {
-  if (engine === 'deepseek-v4-pro' && deepseekKey) {
+  // 1. If active engine is DeepSeek-V4-Pro
+  if (engine === 'deepseek-v4-pro') {
+    const cleanDsKey = deepseekKey?.trim();
+    if (!cleanDsKey) {
+      if (geminiKey?.trim()) {
+        console.warn('[DeepSeek] ไม่พบคีย์ DeepSeek สลับใช้ Gemini สำรองอัตโนมัติ');
+        const gRes = await callGeminiDirect(promptText, geminiKey.trim());
+        return {
+          text: gRes,
+          engineUsed: 'gemini-3.8-flash',
+          fallbackApplied: true,
+          fallbackReason: 'ไม่พบคีย์ DeepSeek ในระบบ สลับใช้ Gemini สำรองอัตโนมัติ'
+        };
+      }
+      throw new Error('กรุณาระบุ DeepSeek API Key (sk-...) ในแถบตั้งค่าโมเดลด้านซ้ายก่อนเริ่มสร้างเพลง');
+    }
+
     try {
+      console.log('[DeepSeek] Calling api.deepseek.com/chat/completions ...');
       const res = await fetch('https://api.deepseek.com/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${deepseekKey.trim()}`,
+          Authorization: `Bearer ${cleanDsKey}`,
         },
         body: JSON.stringify({
           model: 'deepseek-chat',
           messages: [
             {
               role: 'system',
-              content: 'You are an elite commercial songwriter and Suno v6 prompt architect. Respond strictly with a valid JSON object matching the requested schema.',
+              content: 'You are an elite commercial songwriter and Suno v6 prompt architect. Respond strictly with a valid JSON object matching the requested schema. Ensure the "content" field contains a comprehensive, richly structured song with dense [Square Bracket] metatags reaching 3,500 to 5,000 characters without exceeding 5,000 characters.',
             },
             { role: 'user', content: promptText },
           ],
           response_format: { type: 'json_object' },
           temperature: 0.75,
+          max_tokens: 8192,
         }),
+        signal: AbortSignal.timeout(90000),
       });
+
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
-        throw new Error(`DeepSeek error: ${errText.slice(0, 150)}`);
+        let errMsg = `Status ${res.status} (${res.statusText})`;
+        try {
+          const errObj = JSON.parse(errText);
+          if (errObj?.error?.message) errMsg = `${errMsg}: ${errObj.error.message}`;
+        } catch {
+          if (errText) errMsg = `${errMsg}: ${errText.slice(0, 150)}`;
+        }
+        throw new Error(errMsg);
       }
+
       const data = await res.json();
       const content = data?.choices?.[0]?.message?.content?.trim();
-      if (!content) throw new Error('DeepSeek returned empty content');
+      if (!content) throw new Error('DeepSeek ส่งข้อมูลกลับมาว่างเปล่า');
       return { text: content, engineUsed: 'deepseek-v4-pro', fallbackApplied: false };
-    } catch (err: any) {
-      if (geminiKey) {
-        const gRes = await callGeminiDirect(promptText, geminiKey);
-        return { text: gRes, engineUsed: 'gemini-3.8-flash', fallbackApplied: true, fallbackReason: err.message };
+    } catch (dsErr: any) {
+      console.warn('[DeepSeek Error]', dsErr);
+      const dsErrMsg = dsErr?.message || String(dsErr);
+
+      // Attempt fallback to Gemini only if geminiKey is available
+      const cleanGeminiKey = geminiKey?.trim();
+      if (cleanGeminiKey) {
+        console.warn(`[Fallback] DeepSeek ขัดข้อง (${dsErrMsg}) กำลังสลับไปใช้ Gemini สำรอง...`);
+        try {
+          const gRes = await callGeminiDirect(promptText, cleanGeminiKey);
+          return {
+            text: gRes,
+            engineUsed: 'gemini-3.8-flash',
+            fallbackApplied: true,
+            fallbackReason: `DeepSeek ขัดข้อง (${dsErrMsg}) -> ระบบสลับใช้ Gemini สำรองอัตโนมัติสำเร็จ`
+          };
+        } catch (geminiErr: any) {
+          throw new Error(
+            `ไม่สามารถสร้างเพลงได้ ทั้งสองระบบขัดข้อง:\n` +
+            `• 1. โมเดลหลัก DeepSeek: ${dsErrMsg}\n` +
+            `• 2. โมเดลสำรอง Gemini: ${geminiErr?.message || geminiErr}`
+          );
+        }
       }
-      throw err;
+
+      // If no Gemini key, throw DeepSeek error directly
+      throw new Error(`DeepSeek API ขัดข้อง: ${dsErrMsg}`);
     }
   }
 
-  if (geminiKey) {
-    const gRes = await callGeminiDirect(promptText, geminiKey);
+  // 2. If active engine is Gemini
+  const cleanGeminiKey = geminiKey?.trim();
+  if (cleanGeminiKey) {
+    const gRes = await callGeminiDirect(promptText, cleanGeminiKey);
     return { text: gRes, engineUsed: 'gemini-3.8-flash', fallbackApplied: false };
   }
 
-  throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ และไม่พบคีย์ API สำหรับเรียกใช้งานตรง กรุณาใส่ API Key ในแถบตั้งค่าโมเดล');
+  throw new Error('กรุณาระบุ Gemini API Key (AIzaSy...) ในแถบตั้งค่าโมเดลด้านซ้าย');
 }
 
 export const generateThaiLyrics = async (input: SongInput): Promise<{
@@ -178,24 +259,40 @@ export const generateThaiLyrics = async (input: SongInput): Promise<{
   const moodString = normalizedInput.moods.join(", ");
   const activeEngine: AiEngineId = input.aiEngine || 'deepseek-v4-pro';
 
+  const isStaticHosting = typeof window !== 'undefined' && (
+    window.location.hostname.includes('github.io') ||
+    window.location.hostname.endsWith('.pages.dev') ||
+    window.location.protocol === 'file:'
+  );
+
   try {
     let data: any;
-    try {
-      data = await postJsonWithWarmupRetry("/api/gemini/generate-lyrics", {
-        promptText: pipeline.promptText,
-        aiEngine: activeEngine,
-        customApiKey: input.customApiKey,
-        geminiApiKey: input.geminiApiKey,
-        deepseekApiKey: input.deepseekApiKey,
-      });
-    } catch (serverErr) {
-      console.warn("[GeminiService] Server API unavailable or static hosting, falling back to direct browser API:", serverErr);
+    if (isStaticHosting) {
+      console.log('[GeminiService] Running on static hosting (GitHub Pages), calling browser direct AI engine...');
       data = await generateDirectFromBrowser(
         activeEngine,
         pipeline.promptText,
         input.deepseekApiKey || input.customApiKey,
         input.geminiApiKey || input.customApiKey
       );
+    } else {
+      try {
+        data = await postJsonWithWarmupRetry("/api/gemini/generate-lyrics", {
+          promptText: pipeline.promptText,
+          aiEngine: activeEngine,
+          customApiKey: input.customApiKey,
+          geminiApiKey: input.geminiApiKey,
+          deepseekApiKey: input.deepseekApiKey,
+        });
+      } catch (serverErr) {
+        console.warn("[GeminiService] Server API unavailable or dev server offline, falling back to direct browser API:", serverErr);
+        data = await generateDirectFromBrowser(
+          activeEngine,
+          pipeline.promptText,
+          input.deepseekApiKey || input.customApiKey,
+          input.geminiApiKey || input.customApiKey
+        );
+      }
     }
 
     let text: string = data.text || '';
@@ -246,20 +343,37 @@ export const generateThaiLyrics = async (input: SongInput): Promise<{
     const arrangementDescription = parsed.arrangementDescription || resolvedProfile.defaultArrangement;
     const productionDescription = parsed.productionDescription || resolvedProfile.defaultProduction;
 
-    // Section 2: 7-Layer Sonic Formula (Option A & Option B) with Lyric-Bleed & Verdict Sanitizer
+    // Section 2: 7-Layer Sonic Formula (Option A & Option B) with Lyric-Bleed & Verdict Sanitizer (Max 150 chars for Suno v6)
     const rawStyleA = normalizedInput.customStylePrompt
       ? `${normalizedInput.customStylePrompt}, ${parsed.stylePrompt || ''}`
       : (parsed.stylePrompt || `${normalizedInput.genre}, ${resolvedProfile.eraSonicSignature}, ${resolvedProfile.defaultBpmRange}, ${resolvedProfile.defaultKey}, ${resolvedProfile.defaultArrangement}, ${resolvedProfile.defaultVocalStyle}, ${resolvedProfile.defaultProduction}`);
-    const stylePrompt = sanitizeStylePromptForSunoV6(rawStyleA, 250);
+    const stylePrompt = sanitizeStylePromptForSunoV6(rawStyleA, 150);
 
     const rawStyleB = parsed.stylePromptOptionB || `Stripped-back Acoustic & Late-Night Vibe ${normalizedInput.genre}, warm intimate instrumentation, ${resolvedProfile.defaultKey}, close-miked vocals forward and dry, natural room decay`;
-    const stylePromptOptionB = sanitizeStylePromptForSunoV6(rawStyleB, 250);
+    const stylePromptOptionB = sanitizeStylePromptForSunoV6(rawStyleB, 150);
 
     const rawConcise = parsed.conciseStylePrompt || stylePrompt;
     const conciseStylePrompt = sanitizeStylePromptForSunoV6(rawConcise, 120);
 
     // Stage 11: Pre-Display Validation & Automatic Lyric Sanitization
-    let rawLyrics = parsed.content || "ไม่พบเนื้อเพลง กรุณากดสร้างใหม่อีกครั้ง";
+    // DEBUG: log all keys returned by AI to diagnose missing fields
+    console.log('[DEBUG] AI response keys:', Object.keys(parsed));
+    console.log('[DEBUG] content field:', parsed.content ? `present (${String(parsed.content).length} chars)` : 'MISSING');
+
+    // Multi-field fallback: AI may return lyrics under different field names
+    let rawLyrics: string = parsed.content
+      || parsed.lyrics
+      || parsed.lyricsContent
+      || parsed.song_lyrics
+      || parsed.fullLyrics
+      || parsed.verse
+      || parsed.songContent
+      || '';
+
+    if (!rawLyrics || rawLyrics.trim().length < 10) {
+      console.warn('[DEBUG] No lyrics found in parsed JSON. Keys available:', JSON.stringify(Object.keys(parsed)));
+      rawLyrics = "ไม่พบเนื้อเพลง กรุณากดสร้างใหม่อีกครั้ง";
+    }
 
     // Run Genius API Quality Control & Anti-Plagiarism Audit via server endpoint
     let qcReport: GeniusQcReport | undefined;

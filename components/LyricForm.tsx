@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SongInput, Genre, SongLength, LanguageMode, EnglishMixRatio, SongwritingMode, GeneratedLyric, PresetSyncPayload, SunoModelTier } from '../types';
+import { SongInput, Genre, SongLength, LanguageMode, EnglishMixRatio, SongwritingMode, GeneratedLyric, PresetSyncPayload, SunoModelTier, SONG_LENGTH_OPTIONS } from '../types';
 import { GENRE_GROUPS, MOOD_GROUPS, GENRES, MOODS, THEME_SUGGESTIONS, ARTIST_STYLES } from '../constants';
 import { VIRAL_CASE_STUDIES, SUNO_V6_MODELS } from '../data/viralMusicKnowledge';
 import { DEFAULT_STRUCTURE_SECTIONS } from '../services/songArchitectureRules';
 import {
   Sparkles, Dices, Sliders, Check, X, Music, Lightbulb, Wand2,
-  Upload, RefreshCw, SlidersHorizontal, Flame, Heart, Plus, ChevronDown, BookOpen
+  Upload, RefreshCw, SlidersHorizontal, Flame, Heart, Plus, ChevronDown, BookOpen, Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -105,7 +105,7 @@ export const LyricForm: React.FC<LyricFormProps> = ({
     artist: ARTIST_STYLES[0],
     genre: 'Pop, Hip-hop' as Genre,
     moods: ['สดใส (Bright)', 'มีความหวัง (Hopeful)'],
-    length: '3-4 min' as SongLength,
+    length: '3:30 min' as SongLength,
     theme: externalTheme || 'ในวันที่เหนื่อยล้า ยังมีเสียงเพลงพาเราเดินต่อไปข้างหน้า',
     language: selectedLanguage || ('Thai Only' as LanguageMode),
     englishMixRatio: englishMixRatio || 25,
@@ -892,9 +892,9 @@ export const LyricForm: React.FC<LyricFormProps> = ({
         {/* 3-Card Model & Quality Row (Matches Reference Image Step 3) */}
         <div className="grid grid-cols-3 gap-2">
           {[
-            { id: 'v6' as SunoModelTier, label: 'เวอร์ชัน', title: 'v6', sub: 'แนะนำล่าสุด' },
+            { id: 'v6' as SunoModelTier, label: 'เวอร์ชัน', title: 'v6', sub: 'แนะนำล่าสุด (5,000 ตัว)' },
             { id: 'v6-wild' as SunoModelTier, label: 'คุณภาพ', title: 'v6-wild', sub: 'คมชัด รายละเอียดสูง' },
-            { id: 'v6-mini' as SunoModelTier, label: 'ความยาว', title: 'v6-mini', sub: 'เร็ว ประหยัดทรัพยากร' },
+            { id: 'v6-mini' as SunoModelTier, label: 'โหมดด่วน', title: 'v6-mini', sub: 'ประหยัดโควต้า' },
           ].map(card => {
             const isSelected = currentSunoModel === card.id;
             return (
@@ -921,10 +921,81 @@ export const LyricForm: React.FC<LyricFormProps> = ({
           })}
         </div>
 
+        {/* Prominent Song Length & Character Budget (Always visible: 1:30 to 6:00 min with 5,000 char capacity) */}
+        <div className="bg-[#FAFAFA] p-3 rounded-xl border border-[#E8E8E8] space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-1.5">
+            <label className="text-[11px] font-extrabold text-[#111111] flex items-center gap-1.5">
+              <Clock size={13} className="text-[#111111]" />
+              <span>ความยาวเพลง &amp; โควต้าเนื้อเพลง (Suno v6: ลิมิต 5,000 ตัวอักษร)</span>
+            </label>
+            {(() => {
+              const currentCfg = SONG_LENGTH_OPTIONS.find(opt =>
+                opt.id === input.length ||
+                (input.length === '3-4 min' && opt.id === '3:30 min') ||
+                (input.length === '2-3 min' && opt.id === '2:30 min') ||
+                (input.length === '4-5 min' && opt.id === '4:30 min')
+              ) || SONG_LENGTH_OPTIONS[2];
+              return (
+                <span className="text-[10px] font-mono text-[#111111] bg-white border border-[#E0E0E0] px-2 py-0.5 rounded-md font-bold shadow-2xs">
+                  เป้าหมายเนื้อร้อง: {currentCfg.targetChars}
+                </span>
+              );
+            })()}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+            {SONG_LENGTH_OPTIONS.map(opt => {
+              const isSelected = input.length === opt.id ||
+                (input.length === '3-4 min' && opt.id === '3:30 min') ||
+                (input.length === '2-3 min' && opt.id === '2:30 min') ||
+                (input.length === '4-5 min' && opt.id === '4:30 min');
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setInput(prev => ({ ...prev, length: opt.id }))}
+                  className={`p-2 rounded-lg text-left transition cursor-pointer border ${
+                    isSelected
+                      ? 'bg-[#111111] text-white border-[#111111] shadow-xs'
+                      : 'bg-white hover:bg-[#F0F0F0] text-[#333333] border-[#E8E8E8]'
+                  }`}
+                >
+                  <div className="text-xs font-bold leading-tight">{opt.id.replace(' min', '')} นาที</div>
+                  <div className={`text-[10px] truncate mt-0.5 ${isSelected ? 'text-[#DDDDDD]' : 'text-[#777777]'}`}>
+                    {opt.label.split('(')[1]?.replace(')', '') || ''}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {(() => {
+            const currentCfg = SONG_LENGTH_OPTIONS.find(opt =>
+              opt.id === input.length ||
+              (input.length === '3-4 min' && opt.id === '3:30 min') ||
+              (input.length === '2-3 min' && opt.id === '2:30 min') ||
+              (input.length === '4-5 min' && opt.id === '4:30 min')
+            ) || SONG_LENGTH_OPTIONS[2];
+            return (
+              <div className="text-[11px] text-[#555555] bg-white px-2.5 py-1.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-1 border border-[#E8E8E8]">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                  <span className="font-bold text-[#111111] shrink-0">💡 เหมาะกับ:</span>
+                  <span className="font-semibold text-[#111111]">{currentCfg.suitableGenre}</span>
+                  <span className="hidden sm:inline text-[#999999]">—</span>
+                  <span className="text-[#666666]">{currentCfg.description}</span>
+                </div>
+                <span className="text-[9px] font-semibold text-[#36A66A] shrink-0">
+                  ✓ เน้นแท็ก [...] เฉียบขาด 3,500–5,000 ตัว | Style ≤150 ตัว
+                </span>
+              </div>
+            );
+          })()}
+        </div>
+
         {/* Expanded Vocal, Length, Keywords, Weirdness, Style Influence & Exclude Controls */}
         {showAdvanced && (
           <div className="p-3 bg-[#F8F8F8] border border-[#E8E8E8] rounded-xl space-y-3 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {/* Vocal Character */}
               <div>
                 <label className="text-[10px] font-bold text-[#555555] block mb-1">คาแรกเตอร์เสียงร้อง (Artist Style)</label>
@@ -952,20 +1023,6 @@ export const LyricForm: React.FC<LyricFormProps> = ({
                   <option value="Female">เสียงร้องหญิง (Female Vocal)</option>
                   <option value="Duet">ร้องคู่ ชาย-หญิง (Duet)</option>
                   <option value="Group">ร้องกลุ่ม / แบรนด์ (Group)</option>
-                </select>
-              </div>
-
-              {/* Song Length */}
-              <div>
-                <label className="text-[10px] font-bold text-[#555555] block mb-1">ความยาวเพลง (Song Length)</label>
-                <select
-                  value={input.length}
-                  onChange={e => setInput(prev => ({ ...prev, length: e.target.value as SongLength }))}
-                  className="w-full bg-white border border-[#E8E8E8] rounded-lg px-2.5 py-1.5 text-xs text-[#111111] font-medium outline-none focus:border-[#111111]"
-                >
-                  <option value="2-3 min">2–3 นาที (กระชับ ไวรัล)</option>
-                  <option value="3-4 min">3–4 นาที (มาตรฐานซิงเกิล)</option>
-                  <option value="4-5 min">4–5 นาที (Full Arrangement)</option>
                 </select>
               </div>
             </div>

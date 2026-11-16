@@ -163,7 +163,7 @@ export const BANNED_VERDICT_ADJECTIVES = [
  * 2) Replaces vague verdict adjectives ("radio-ready", "professional", "amazing")
  *    with physical recording & mix relationship descriptors.
  */
-export function sanitizeStylePromptForSunoV6(rawPrompt: string, maxLength = 250): string {
+export function sanitizeStylePromptForSunoV6(rawPrompt: string, maxLength = 150): string {
   let cleaned = (rawPrompt || '')
     .replace(/["“”]/g, '')
     .replace(/\s+/g, ' ')
@@ -424,6 +424,53 @@ export function scanArchaicWordsInText(text: string): ModernizationReplacement[]
 /**
  * Builds the complete Thai & Global Hitmaker + Suno v6 Architecture Engine Pipeline
  */
+export function resolveLengthSpecs(length: string): {
+  targetDuration: string;
+  charRange: string;
+  sectionStructure: string;
+  arrangementCues: string;
+} {
+  if (length === '1:30 min') {
+    return {
+      targetDuration: '1:30 นาที (สปีดสั้น ไวรัล)',
+      charRange: '2,500 – 3,500 ตัวอักษร',
+      sectionStructure: '[Cold Open: Audible Inhale] -> [Intro: Fast Hook Plucks] -> [Verse 1: Tight Rhythmic Flow] -> [Pre-Chorus: Tension Build, Pitch Climbs] -> [Drop: Hard Impact] -> [Chorus: High Energy Belting] -> [Post-Chorus: Catchy Ad-lib Tag] -> [Outro: Quick Stutter Cut] -> [End]',
+      arrangementCues: 'กระชับ ฉับไว ปล่อยท่อนฮุกภายใน 15-20 วินาทีแรก แท็กจังหวะกระตุ้นความสนใจตลอดเวลา จบเร็วแบบหักมุม'
+    };
+  }
+  if (length === '2:30 min' || length === '2-3 min') {
+    return {
+      targetDuration: '2:30 นาที (สตรีมมิ่งฮิต / Hip-hop / Trap / T-Pop ยุคใหม่)',
+      charRange: '3,200 – 4,000 ตัวอักษร',
+      sectionStructure: '[Cold Open] -> [Intro: Signature Riff] -> [Verse 1: Mono Centered, Dry] -> [Pre-Chorus: Ascending Melody] -> [Chorus: Wide Stereo Spread] -> [Post-Chorus: Earworm Ad-libs] -> [Verse 2: Dynamic Shift] -> [Pre-Chorus] -> [Chorus] -> [Short Outro: Decrescendo] -> [Fade Out] -> [End]',
+      arrangementCues: 'บีตกระชับ ท่อนฮุกมาไว แท็กสลับ dynamic ชัดเจนระหว่าง Verse (แคบ แห้ง ชัด) และ Chorus (กว้าง ใหญ่ พุ่ง)'
+    };
+  }
+  if (length === '4:30 min' || length === '4-5 min') {
+    return {
+      targetDuration: '4:30 นาที (Full Storytelling & Solo / Extended Ballad / หมอลำเต้ย / Rock มี Solo)',
+      charRange: '4,000 – 4,800 ตัวอักษร',
+      sectionStructure: '[Cold Open: Intimate Whispered Intro] -> [Ambient Intro: Instruments Gradually Enter] -> [Verse 1: Deep Story Setup] -> [Pre-Chorus: Building Tension] -> [Chorus: Huge Melodic Lift] -> [Post-Chorus] -> [Verse 2: Narrative Escalation] -> [Pre-Chorus: Urgent Rhythm] -> [Chorus] -> [Instrumental Break: Virtuosic Guitar / Phin / Synth Solo] -> [Bridge: Emotional Confession, Stripped-back Piano] -> [Transition: Dominant 7th Chord Build, Drum Swell] -> [Final Chorus: Key Change (+1 Semitone), Modulate Up Half-Step, Full Stadium Belt] -> [Outro: Extended Decrescendo, Soft Plucks] -> [Fade Out] -> [Final Sustained Chord] -> [End]',
+      arrangementCues: 'เล่าเรื่องลึกซึ้ง 4 องก์ มีท่อนโซโล่เครื่องดนตรีชิ้นเอก มีท่อนเปลี่ยนคีย์ (Modulate Up) ยกอารมณ์ และ Outro ค่อยๆ ผ่อนพลัง'
+    };
+  }
+  if (length === '6:00 min') {
+    return {
+      targetDuration: '6:00 นาที (Epic Extended Masterpiece / Progressive / Club Mix / Live Concert Jam)',
+      charRange: '4,500 – 5,000 ตัวอักษร (ลิมิตสูงสุดของ Suno v6)',
+      sectionStructure: '[Atmospheric Cold Open: Audible Inhale, Natural Room Ambience] -> [Extended Intro: 4-Layer Instrument Entry, Tape Warmth] -> [Verse 1: Cinematic Worldbuilding] -> [Pre-Chorus: Slow Burning Tension] -> [Chorus: Explosive Full-Band Entrance] -> [Post-Chorus: Vocal Runs] -> [Verse 2: Darker Emotional Shift] -> [Pre-Chorus: Double Time Hi-Hats] -> [Chorus] -> [Instrumental Break 1: Rhythm Section Jam] -> [Verse 3: Climax Revelation / Twist] -> [Bridge: Ambient Silence into High-Pass Filter Sweep] -> [Instrumental Solo: Dual Lead Guitars / Saxophone / Synthesizer Duel] -> [Pre-Chorus: Snare Roll Crescendo] -> [Final Chorus: Modulation (+1 Semitone), Maximum Stadium Belting, Octave Harmony] -> [Extended Outro: Jam Session, Layered Decrescendo] -> [Solo Voice Held in Air] -> [Final Sustained Reverb Decay] -> [End]',
+      arrangementCues: 'มหากาพย์ดนตรีเต็มสูบ แท็กละเอียดทุกจุดเลี้ยว ดนตรีมีเลเยอร์พัฒนาการ 4-5 ช่วง ท่อน Solo อลังการ'
+    };
+  }
+  // Default: '3:30 min' or '3-4 min'
+  return {
+    targetDuration: '3:30 นาที (มาตรฐานซิงเกิลสากล / Commercial Pop / R&B / Pop-Rock)',
+    charRange: '3,500 – 4,500 ตัวอักษร',
+    sectionStructure: '[Cold Open: Audible Inhale] -> [Intro: Acoustic Chords & Soft Rhythm] -> [Verse 1: Mono Centered, Intimate Close-Mic] -> [Pre-Chorus: Tension Build, Pitch Climbs] -> [Chorus: Belting, Wide Stereo Spread, Anthem] -> [Post-Chorus: Catchy Ad-libs] -> [Verse 2: Time Progression, Active Bassline] -> [Pre-Chorus] -> [Chorus] -> [Bridge: Emotional Peak, Stripped Down] -> [Instrumental Break: Melodic Solo / Drum Fill] -> [Transition: Build] -> [Final Chorus: Key Change (+1 Semitone), Modulate Up, Full Climax] -> [Outro: Gradual Decrescendo] -> [Fade Out] -> [Final Chord] -> [End]',
+    arrangementCues: 'สมดุลสมบูรณ์แบบตามสูตรเพลงฮิตสากล ครบทุกช่วงอารมณ์ ดนตรีเปิดฉากคมชัด ฮุกทรงพลัง บริดจ์กระชากอารมณ์ และฮุกสุดท้ายยกคีย์'
+  };
+}
+
 export function buildSongwritingPipeline(rawInput: SongInput): AssembledSongPipeline {
   const mode = rawInput.mode || 'create';
   const genre = (rawInput.genre || 'Pop').trim() || 'Pop';
@@ -445,6 +492,7 @@ export function buildSongwritingPipeline(rawInput: SongInput): AssembledSongPipe
   const thaiMixRatio = 100 - englishMixRatio;
 
   const profile = resolveGenreProfile(genre);
+  const lengthSpecs = resolveLengthSpecs(length);
 
   // Resolve Songwriting Mode ('storytelling' | 'emotional' | 'hybrid')
   const requestedSongwritingMode: SongwritingMode = rawInput.songwritingMode || 'auto';
@@ -594,6 +642,10 @@ ${combinedOutcome || 'ต่อยอดดราฟต์สั้นให้�
 - อารมณ์เพลงที่ต้องการสื่อ (Multi-Mood Fusion): "${moods.join(', ')}"
 - โหมดสถาปัตยกรรมการแต่งเพลงที่เลือก: "${resolvedSongwritingMode.toUpperCase()}" (${requestedSongwritingMode === 'auto' ? 'AI วิเคราะห์ให้อัตโนมัติตามแนวเพลง' : 'ผู้ใช้ระบุโหมดโดยตรง'})
 - โครงสร้างท่อนเพลงที่ต้องการ: [${resolvedStructure.join(' -> ')}] | ความยาว: ${length}
+- ความยาวเพลงเป้าหมาย: ${lengthSpecs.targetDuration}
+- โควตาขนาดเนื้อร้องรวมแท็กเป้าหมาย: ${lengthSpecs.charRange} (ขีดจำกัดสูงสุดของระบบ Suno v6 คือ 5,000 ตัวอักษร)
+- สถาปัตยกรรมโครงสร้างท่อนเพลงที่แนะนำ: ${lengthSpecs.sectionStructure}
+- ทิศทางการจัดเรียงดนตรีตามความยาว: ${lengthSpecs.arrangementCues}
 - คาแรกเตอร์เสียงร้อง & เพศนักร้อง: "${artist}" | Vocal Gender: "${vocalGender}"
 - สัดส่วนภาษาที่บังคับใช้: ${languageDirective}
 - พารามิเตอร์ Suno v6: Model = ${resolvedSunoModel}, Weirdness = ${resolvedWeirdness}%, Style Influence = ${resolvedStyleInfluence}%, Exclude = "${resolvedExcludeStyles}"
@@ -633,18 +685,19 @@ ${songwritingModeDirective}
 ====================================================================
 4. กฎไวยากรณ์ควบคุมเอ็นจิ้นเสียง SUNO V6 ([] VS () MASTER ARCHITECTURE - ฉบับสมบูรณ์ 30 ก.ย. - 13 พ.ย. 2026)
 ====================================================================
-1. กฎของ [Square Brackets] — คำสั่งโครงสร้าง ช่องเสียง และฟิสิกส์ดนตรี (ต้องไม่ออกเสียงร้อง):
-   - ข้อความใน [...] ต้องเป็นภาษาอังกฤษล้วน 100% เสมอ และยาวไม่เกิน 1–6 คำต่อแท็ก! (ห้ามใส่ภาษาไทยใน [...] เด็ดขาด)
-   - ใช้เทคนิค Tag Stacking รวมโครงสร้างและอารมณ์การร้องไว้ด้วยกัน และเลือกใช้แท็กที่เหมาะกับแนวเพลงอัตโนมัติ เช่น:
-     * ช่องเสียงตามท่อน: [Chest Voice] (Verse), [Mixed Voice] (Pre-Chorus), [Head Voice] หรือ [Falsetto] (Bridge), [Belting] (Chorus)
-     * เพลงร้องคู่ชาย-หญิง (เมื่อโจทย์เป็น Duet): [Verse 1: Male Lead], [Verse 2: Female Lead], [Chorus: Duet Harmony, Male and Female Together]
-     * อารมณ์และลมหายใจ: [Audible Inhale], [Heavy sigh], [Choked up], [Gasp] ก่อนคำร้องสำคัญ
-     * ท่อนส่งก่อนฮุกและการเร่งจังหวะ: [Pre-Chorus: Ascending Melody, Pitch Climbs], [Drum Fill], [Stop Time], [Bass Run]
-     * เวทีเสียงและการไล่พลัง: [Mono Centered Verse], [Wide Stereo Spread], [Layered Crescendo], [Cymbal Swell], [Ritardando], [Accelerando]
-     * การดรอป EDM 4 ขั้นตอน (เมื่อเป็นเพลงแดนซ์/อิเล็กทรอนิกส์): [Pre-Chorus: Tension Build] -> [Riser: Snare Roll] -> [Short Silence] -> [Drop: Hard Drop, Heavy Sidechain, Sub-Bass Impact]
-     * การเปลี่ยนคีย์ยกอารมณ์ท่อนฮุกสุดท้าย (เมื่อเป็นเพลง Ballad/Pop/Rock พลังสูง): [Transition: Dominant 7th Chord Build] -> [Final Chorus: Key Change (+1 Semitone), Modulate Up Half-Step, Full Belt]
-     * แก้เสียงร้องจมใน v6: เติม [Silence] ท้ายบรรทัดที่ร้องรัวเพื่อให้ AI หยุดหายใจและไม่ร้องทับบีต
-     * จุดพลิกและโซ่คำสั่งตอนจบ (ป้องกันเพลงจบห้วน Premature Cutoff): [Vocal Break: Solo voice held in air], [Stutter Gate Break: 16th-note gate], [Breakdown: High-pass filter sweep], [False Ending: Sudden Silence], [Surprise Explosive Climax], [Outro: Gradual Decrescendo] -> [Fade Out] -> [Final Chord] -> [End]
+1. กฎของ [Square Brackets] — คำสั่งโครงสร้าง ช่องเสียง ฟิสิกส์ดนตรี และเป้าหมาย 3,500–5,000 ตัวอักษร:
+   - โควตาของ Suno v6: ช่อง Lyrics รองรับได้สูงสุด 5,000 ตัวอักษร (รวมเนื้อร้อง ช่องว่าง แท็ก [...] และ (...))
+   - เป้าหมายความยาวเนื้อเพลงเต็มในฟิลด์ "content" ต้องอยู่ที่ ${lengthSpecs.charRange} (เป้าหมาย 3,500 – 5,000 ตัวอักษร และต้องไม่เกิน 5,000 ตัวอักษรเด็ดขาด)
+   - ให้น้ำหนักสูงสุดไปที่การใส่แท็ก [Square Brackets] อย่างเฉียบขาด ละเอียด หนาแน่น และแม่นยำสูง (Sharp & Exhaustive [] Tagging):
+     * ข้อความใน [...] ต้องเป็นภาษาอังกฤษล้วน 100% สั้นกระชับ 1–6 คำต่อแท็ก (ห้ามใส่ภาษาไทยใน [...] เด็ดขาด)
+     * แทรกแท็ก [...] ในทุกๆ 2–4 บรรทัด และทุกจุดเลี้ยวของดนตรี เพื่อสั่งการ Suno v6 เล่นดนตรีและคุมเสียงร้องอย่างแม่นยำ:
+       * เสียงบรรยากาศ & เอฟเฟกต์: [Atmospheric Cold Open: Audible Inhale], [Vinyl Crackle], [Rain & Distant Thunder], [16th-note Stutter Gate Break], [High-Pass Filter Sweep], [Sub-Bass Impact]
+       * ช่องเสียงและไมโครโฟน: [Chest Voice, Dry, Mono Centered, Intimate Close-Mic], [Mixed Voice, Pitch Climbs], [Head Voice, Soft Whispered Vocal, Left-Right Stereo Float], [Full Belting, Stadium Reverb, Wide Stereo Spread], [Audible Inhale], [Vocal Fry at Onset], [Heavy Sigh]
+       * เครื่องดนตรีเฉพาะจุด: [Intro: Rhodes Chords, Tape Warmth, 16th Hi-Hats], [Heavy 808 Sub-Bass Glide, Crisp Snare Roll], [Acoustic Guitar Fingerpicking, Close-Mic], [Distortion Guitar Power Chords, Driving Rhythm], [Thai Phin & Khaen Pentatonic Accents]
+       * ท่อนส่งและไดนามิก: [Pre-Chorus: Tension Build, Ascending Melody], [Drum Fill: Snare Roll into Crash], [Stop Time], [Short Silence], [Drop: Hard Sub-Bass Impact, Heavy Sidechain]
+       * ท่อนโซโล่และสะกดอารมณ์: [Instrumental Break: Melodic Guitar Solo], [Phin Solo: Expressive Pentatonic Bends], [Saxophone Solo], [Synthesizer Lead Solo], [Bridge: Stripped Back, Piano Only, Emotional Peak]
+       * การเปลี่ยนคีย์และท่อนจบ: [Transition: Dominant 7th Chord Build, Cymbal Swell], [Final Chorus: Key Change (+1 Semitone), Modulate Up Half-Step, Full Band Climax, Octave Harmony], [Post-Chorus: Catchy Ad-lib Hook], [Outro: Extended Decrescendo, Soft Plucked Melody], [Fade Out], [Final Sustained Chord], [Silence], [End]
+     * เขียนเนื้อเพลงเต็มรูปแบบตามโครงสร้างความยาว: ${lengthSpecs.sectionStructure} โดยห้ามย่อคำว่า [Repeat Chorus] ต้องพิมพ์คำร้องเต็มทุกท่อนเสมอ
 2. กฎของ (Parentheses) — เสียงร้องประสาน เสียงพูดข้างหู และ Ad-lib ที่เปล่งเสียงออกไมค์จริง:
    - ใส่ใน (...) เฉพาะคำร้องประสาน, Interlocking Vocals (เว้น ... 1-2 วินาทีก่อนแทรก), เสียงพูดข้างหู (spoken, soft: ...) หรือ Ad-lib สั้นๆ ไม่เกิน 1–4 คำเท่านั้น!
    - ใช้เครื่องหมายตัวหนอน (~) สำหรับลากเสียงเอื้อนลูกคอ เช่น โฮ~โอ~โอ~ คู่กับ [Vocal Ad-libs: Virtuosic Melisma, Soulful Runs]
@@ -662,21 +715,62 @@ ${songwritingModeDirective}
      (2) Arrangement Lift (คงเนื้อร้องเดิมแต่เติมเครื่องดนตรีเต็มวง + Octave Harmony)
      (3) Intentional Final Lyric Variation (เปลี่ยนบรรทัดสุดท้ายเพื่อสรุปเรื่องราวหรือหักมุม)
    - ห้ามย่อเนื้อเพลงด้วย [Repeat Chorus] เด็ดขาด ต้องพิมพ์ท่อน [Chorus] เต็มทุกบรรทัดเสมอ
+   - กฎการขยายท่อนเพลงให้ถึงเป้าหมาย 3,500 – 5,000 ตัวอักษรเต็มพิกัดของ Suno v6:
+     * เพื่อให้เนื้อเพลงมีความยาวสมบูรณ์และคุ้มค่าโควตา 5,000 ตัวอักษรของ Suno v6 ให้เขียนเนื้อร้องและแท็ก [...] ครบถ้วนทุกท่อนอย่างละเอียดลึกซึ้ง (ห้ามเขียนสั้นเพียง 1-2 ท่อนแล้วจบ):
+       (1) ท่อน Verse (อย่างน้อย Verse 1 และ Verse 2 ความยาวท่อนละ 6–8 บรรทัด พร้อมแท็กคุมเสียงร้องและการหายใจ)
+       (2) ท่อน Pre-Chorus (อย่างน้อย 2 รอบ เร่งสัมผัส AABB ส่งพลัง)
+       (3) ท่อน Chorus (พิมพ์เต็มทุกบรรทัด 4–8 บรรทัด พร้อมคำร้องประสานในวงเล็บและแท็กจัดวางเวทีเสียง)
+       (4) ท่อน Post-Chorus / Earworm Hook Tag (วลีจำง่าย 2–4 บรรทัด)
+       (5) ท่อน Instrumental Solo Break / Guitar Solo / Phin Solo (ระบุเครื่องดนตรีและลีลาการเล่นอย่างชัดเจน)
+       (6) ท่อน Bridge (เรื่องราวหักมุม หรือการเปิดใจครั้งสำคัญ 4–6 บรรทัด)
+       (7) ท่อน Final Chorus (ยกคีย์ +1 Semitone, ร้องเต็มพลัง Full Belt, เครื่องดนตรีเต็มวง)
+       (8) ท่อน Outro (ค่อยๆ ผ่อนพลัง ลดเครื่องดนตรีทีละชิ้น จนถึงความเงียบ Fade Out -> Final Chord -> End)
 
 ====================================================================
-5. กฎการคอมไพล์ 7-LAYER SONIC FORMULA & ANTI-DEAD VERSE DIRECTIVE
+5. กฎการคอมไพล์ STYLE PROMPT (จำกัดความยาวไม่เกิน 150 ตัวอักษรตามมาตรฐาน SUNO V6)
 ====================================================================
-สร้าง Style Prompt ภาษาอังกฤษความยาวกระชับไม่เกิน 180–250 ตัวอักษร ตามลำดับชั้น Structured Style Blueprint (วาง Dominant Genre ไว้คำแรกสุดเสมอ) โดยห้ามใช้คำคุณศัพท์กว้างๆ อย่าง radio-ready, professional, amazing และห้ามใส่เครื่องหมายคำพูด " เด็ดขาด (ป้องกัน Lyric Bleed):
-- ใช้สภาพกายภาพการบันทึกเสียงจริง: close-miked and dry, Proximity effect (extra low end), warm tape saturation, Live-room Acoustics / Tight Studio Booth / Concert Hall Space, light vocal fry at onset, keep vocal tone and loudness stable across the whole track
-- ป้องกันท่อน Verse พลังตก (Anti-Dead Verse) และระบุความสัมพันธ์ของมิกซ์ใน v6: active verses, full-band energy throughout, bass sits below kick, vocals forward and dry, cymbals washed in background, mono centered verse to wide stereo spread chorus
-- เจาะจงรุ่นเครื่องดนตรีและซินธ์: เช่น Fender Rhodes / Wurlitzer 200A / Hohner Clavinet D6 / Hammond B3 with Leslie, DADGAD / Capo 7 / 12-String Shimmer / Telecaster bridge / Stratocaster position 4 / Les Paul neck, Acid 303 squelch / Lush supersaw / Wobble bass, 808 sub bass glide / reese bass / slap funk bass / upright bass, Traditional bamboo flute (Khlui tone) / Phin & Khaen pentatonic accents
-- "stylePrompt" (Option A - Main Commercial Style Prompt): ซาวด์คอมเมอร์เชียลหลักที่เหมาะกับโจทย์และตลาดที่สุด (ห้ามมีเครื่องหมายคำพูด ")
-- "stylePromptOptionB" (Option B - Alternative Vibe Style Prompt): ซาวด์ทางเลือกที่ 2 ที่ให้มู้ดต่างออกไปอย่างน่าสนใจ (ห้ามมีเครื่องหมายคำพูด ")
+เนื่องจากเราได้ย้ายคำสั่งการจัดเรียงดนตรี ไดนามิก และซาวด์เอฟเฟกต์ทั้งหมดไปควบคุมอย่างเฉียบขาดในแท็ก [...] ในช่อง Lyrics แทนแล้ว ดังนั้น Style Prompt ในช่อง Style of Music จึงต้องสั้น กระชับ คมชัด ไม่เกิน 150 ตัวอักษรเท่านั้น (Character Count ≤ 150):
+- วาง Dominant Genre ไว้คำแรกสุดเสมอ
+- ระบุเฉพาะข้อมูลแก่นแท้ 5 ส่วน: [Dominant Genre], [Era / Sonic Signature], [Key Instruments], [BPM Range], [Musical Key]
+- ห้ามใช้คำคุณศัพท์กว้างๆ อย่าง radio-ready, professional, amazing และห้ามใส่เครื่องหมายคำพูด " เด็ดขาด
+- "stylePrompt" (Option A - Main Commercial Style Prompt): ซาวด์คอมเมอร์เชียลหลักที่เหมาะกับโจทย์และตลาดที่สุด ไม่เกิน 150 ตัวอักษร (ห้ามมีเครื่องหมายคำพูด ")
+- "stylePromptOptionB" (Option B - Alternative Vibe Style Prompt): ซาวด์ทางเลือกที่ 2 ที่ให้มู้ดต่างออกไป ไม่เกิน 150 ตัวอักษร (ห้ามมีเครื่องหมายคำพูด ")
 - "conciseStylePrompt": โหมด Compact Mode (8–15 แท็กสำคัญ ย่อเหลือไม่เกิน 120 ตัวอักษร โดยวางแนวเพลงหลักไว้คำแรกสุด)
 - "excludeStyles": Negative Prompt ภาษาอังกฤษล้วน คั่นด้วยจุลภาค แนะนำใส่ heavy reverb คู่กันเมื่อต้องการแก้เสียงร้องจมใน v6 และห้ามมีคำว่า No
 - ในฟิลด์ "sunoPerformanceTips" ให้ระบุคำแนะนำการตั้งค่า Suno Studio DAW & ZeroDay Mastering DSP (เช่น เป้าหมายความดัง -14 LUFS สำหรับ Spotify / -10 LUFS สำหรับ TikTok, การส่งออก 24-Bit PCM WAV -0.3 dBTP หรือ 32-Bit Float WAV สำหรับ Stems) ด้วยเสมอ
 
-ตอบกลับเป็น JSON ตาม Schema ที่กำหนดเท่านั้น
+ตอบกลับเป็น JSON object ที่มี field ตรงตาม Schema ด้านล่างนี้เท่านั้น ห้ามตอบนอก JSON เด็ดขาด:
+
+{
+  "title": "ชื่อเพลงภาษาไทย",
+  "content": "[Atmospheric Cold Open: Audible Inhale]\n[Intro: Fender Rhodes Chords, Tape Warmth, 16th Hi-Hats]\n[Verse 1: Chest Voice, Dry, Mono Centered, Intimate Close-Mic]\nเนื้อเพลงเต็มทุกท่อนพร้อมแท็ก [...] แบบหนาแน่นเฉียบขาด ความยาวรวม 3,500 – 5,000 ตัวอักษร (ห้ามเกิน 5,000 ตัวอักษรเด็ดขาด)",
+  "stylePrompt": "Option A style prompt ภาษาอังกฤษ กระชับไม่เกิน 150 ตัวอักษร",
+  "stylePromptOptionB": "Option B style prompt ภาษาอังกฤษ กระชับไม่เกิน 150 ตัวอักษร",
+  "conciseStylePrompt": "Compact style prompt ไม่เกิน 120 ตัวอักษร",
+  "genreEraFusion": "แนวเพลงผสมยุค",
+  "songwritingModeUsed": "โหมดการแต่งเพลงที่ใช้",
+  "sevenSecondHook": "ฮุก 7 วินาทีแรก",
+  "viralCaptionLine": "ประโยคหมัดเด็ดสำหรับแชร์",
+  "genreDescription": "คำอธิบายแนวเพลง",
+  "vocalDescription": "คำอธิบายเสียงร้อง",
+  "arrangementDescription": "คำอธิบาย arrangement",
+  "productionDescription": "คำอธิบาย production",
+  "excludeStyles": "negative prompt ภาษาอังกฤษ คั่นด้วยจุลภาค",
+  "vocalGender": "male หรือ female",
+  "weirdness": 35,
+  "styleInfluence": 75,
+  "tempoBpm": "120 BPM",
+  "musicalKey": "C major",
+  "syllableScore": 97,
+  "prosodyEngineeringNotes": ["หมายเหตุฉันทลักษณ์ข้อ 1", "ข้อ 2"],
+  "sunoPerformanceTips": ["เป้าหมายความดัง -14 LUFS สำหรับ Spotify", "ส่งออก 24-Bit PCM WAV -0.3 dBTP"],
+  "modernizationReplacements": [],
+  "sunoModelRecommended": "v6",
+  "tiktokLane": "คำอธิบาย TikTok lane",
+  "sunoMvVisualRecommended": "คำอธิบาย MV visual"
+}
+
+สำคัญ: field "content" ต้องมีเนื้อเพลงเต็มทุกท่อนรวมแท็ก [...] หนาแน่นเฉียบขาด ความยาวรวม 3,500 – 5,000 ตัวอักษร ห้ามเกิน 5,000 ตัวอักษรเด็ดขาด
 `.trim();
 
   return {

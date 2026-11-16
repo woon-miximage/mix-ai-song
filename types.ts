@@ -1,10 +1,62 @@
 export type Genre = 'Pop' | 'R&B' | 'Hip-hop' | 'Synthwave' | 'Ballad' | 'Rock' | 'City Pop' | 'Electronic' | string;
-export type SongLength = '2-3 min' | '3-4 min' | '4-5 min';
+export type SongLength = '1:30 min' | '2:30 min' | '3:30 min' | '4:30 min' | '6:00 min' | '2-3 min' | '3-4 min' | '4-5 min';
 export type LanguageMode = 'Thai Only' | 'Thai-English Mix' | 'English Only';
 export type EnglishMixRatio = 25 | 50 | 75;
 export type SunoModelTier = 'v6' | 'v6-wild' | 'v6-mini';
 export type SongwritingMode = 'auto' | 'storytelling' | 'emotional' | 'hybrid';
 export type AiEngineId = 'gemini-3.8-flash' | 'deepseek-v4-pro';
+
+export interface SongLengthConfig {
+  id: SongLength;
+  label: string;
+  duration: string;
+  targetChars: string;
+  suitableGenre: string;
+  description: string;
+}
+
+export const SONG_LENGTH_OPTIONS: SongLengthConfig[] = [
+  {
+    id: '1:30 min',
+    label: '1:30 นาที (สปีดสั้น)',
+    duration: '01:30',
+    targetChars: '2,500 - 3,500 ตัวอักษร',
+    suitableGenre: 'คลิปสั้น TikTok, Reels, Shorts, Jingle โฆษณา',
+    description: 'ท่อนฮุกกระชับ เปิดฉากไว จบเร็ว เหมาะสำหรับคลิปสั้นและคอนเทนต์ไวรัล'
+  },
+  {
+    id: '2:30 min',
+    label: '2:30 นาที (สตรีมมิ่งฮิต)',
+    duration: '02:30',
+    targetChars: '3,200 - 4,000 ตัวอักษร',
+    suitableGenre: 'T-Pop ยุคใหม่, Hip-hop, Trap, Drill',
+    description: 'บีตกระชับ ท่อนฮุกมาเร็วและจำง่าย ความยาวมาตรฐานของเพลงสตรีมมิ่งยุคปัจจุบัน'
+  },
+  {
+    id: '3:30 min',
+    label: '3:30 นาที (มาตรฐานซิงเกิล)',
+    duration: '03:30',
+    targetChars: '3,500 - 4,500 ตัวอักษร',
+    suitableGenre: 'Commercial Pop, R&B, Pop-Rock, ลูกทุ่งอินดี้',
+    description: 'มาตรฐานเพลงวิทยุสากล สมดุลครบทุกท่อน Verse, Pre-Chorus, Chorus, Bridge, Outro'
+  },
+  {
+    id: '4:30 min',
+    label: '4:30 นาที (Storytelling & Solo)',
+    duration: '04:30',
+    targetChars: '4,000 - 4,800 ตัวอักษร',
+    suitableGenre: 'Indie Folk, Ballad ช้าซึ้ง, หมอลำเต้ยยาว, Rock มี Solo',
+    description: 'เน้นการเล่าเรื่องลึกซึ้ง 4 องก์ พร้อมท่อนโซโล่เครื่องดนตรีและสะกดอารมณ์ผู้ฟัง'
+  },
+  {
+    id: '6:00 min',
+    label: '6:00 นาที (Epic Extended)',
+    duration: '06:00',
+    targetChars: '4,500 - 5,000 ตัวอักษร (เต็มพิกัด Suno v6)',
+    suitableGenre: 'Epic Rock, Progressive, EDM Extended Club Mix, Concert Jam',
+    description: 'เพลงมหากาพย์เต็มรูปแบบ แท็กจัดเต็มทุกจุดเปลี่ยนดนตรี ท่อนโซโล่คู่ และตอนจบอลังการ'
+  }
+];
 
 export interface ModernizationReplacement {
   originalWord: string;
