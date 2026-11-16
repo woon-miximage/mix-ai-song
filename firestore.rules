@@ -1,0 +1,250 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core Reusable Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Validation Blueprint: UserProfile
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'theme', 'fontSize', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'theme', 'fontSize', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && data.theme is string && data.theme.size() <= 32
+        && data.theme in ['light', 'charcoal', 'midnight', 'sunset', 'neon', 'emerald']
+        && data.fontSize is string && data.fontSize.size() <= 16
+        && data.fontSize in ['small', 'medium', 'large']
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 150))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 200))
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: SongProject
+    function isValidSongProject(data) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'title', 'stylePrompt', 'excludeStyles',
+          'vocalGender', 'weirdness', 'styleInfluence', 'content',
+          'timestamp', 'input', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'title', 'stylePrompt', 'stylePromptOptionB',
+          'conciseStylePrompt', 'genreEraFusion', 'songwritingModeUsed',
+          'sevenSecondHook', 'viralCaptionLine', 'prosodyEngineeringNotes',
+          'modernizationReplacements', 'genreDescription', 'vocalDescription',
+          'arrangementDescription', 'productionDescription', 'excludeStyles',
+          'vocalGender', 'weirdness', 'styleInfluence', 'tempoBpm',
+          'musicalKey', 'syllableScore', 'sunoPerformanceTips', 'content',
+          'timestamp', 'input', 'qcReport', 'validationReport',
+          'sunoModelRecommended', 'tiktokLane', 'sunoMvVisualRecommended',
+          'aiEngineUsed', 'aiFallbackApplied',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.title is string && data.title.size() <= 300
+        && data.stylePrompt is string && data.stylePrompt.size() <= 600
+        && data.excludeStyles is string && data.excludeStyles.size() <= 600
+        && data.vocalGender is string && data.vocalGender.size() <= 80
+        && data.weirdness is number && data.weirdness >= 0 && data.weirdness <= 100
+        && data.styleInfluence is number && data.styleInfluence >= 0 && data.styleInfluence <= 100
+        && data.content is string && data.content.size() <= 25000
+        && data.timestamp is number
+        && data.input is map
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && (!('stylePromptOptionB' in data) || (data.stylePromptOptionB is string && data.stylePromptOptionB.size() <= 600))
+        && (!('conciseStylePrompt' in data) || (data.conciseStylePrompt is string && data.conciseStylePrompt.size() <= 300))
+        && (!('genreEraFusion' in data) || (data.genreEraFusion is string && data.genreEraFusion.size() <= 500))
+        && (!('songwritingModeUsed' in data) || (data.songwritingModeUsed is string && data.songwritingModeUsed.size() <= 500))
+        && (!('sevenSecondHook' in data) || (data.sevenSecondHook is string && data.sevenSecondHook.size() <= 600))
+        && (!('viralCaptionLine' in data) || (data.viralCaptionLine is string && data.viralCaptionLine.size() <= 600))
+        && (!('genreDescription' in data) || (data.genreDescription is string && data.genreDescription.size() <= 1000))
+        && (!('vocalDescription' in data) || (data.vocalDescription is string && data.vocalDescription.size() <= 1000))
+        && (!('arrangementDescription' in data) || (data.arrangementDescription is string && data.arrangementDescription.size() <= 1000))
+        && (!('productionDescription' in data) || (data.productionDescription is string && data.productionDescription.size() <= 1000))
+        && (!('tempoBpm' in data) || (data.tempoBpm is string && data.tempoBpm.size() <= 64))
+        && (!('musicalKey' in data) || (data.musicalKey is string && data.musicalKey.size() <= 64))
+        && (!('syllableScore' in data) || (data.syllableScore is number && data.syllableScore >= 0 && data.syllableScore <= 100))
+        && (!('sunoModelRecommended' in data) || (data.sunoModelRecommended is string && data.sunoModelRecommended.size() <= 32 && data.sunoModelRecommended in ['v6', 'v6-wild', 'v6-mini']))
+        && (!('tiktokLane' in data) || (data.tiktokLane is string && data.tiktokLane.size() <= 500))
+        && (!('sunoMvVisualRecommended' in data) || (data.sunoMvVisualRecommended is string && data.sunoMvVisualRecommended.size() <= 300))
+        && (!('aiEngineUsed' in data) || (data.aiEngineUsed is string && data.aiEngineUsed.size() <= 64))
+        && (!('aiFallbackApplied' in data) || data.aiFallbackApplied is bool)
+        && (!('prosodyEngineeringNotes' in data) || (data.prosodyEngineeringNotes is list && data.prosodyEngineeringNotes.size() <= 12 && (data.prosodyEngineeringNotes.size() == 0 || data.prosodyEngineeringNotes[0] is string)))
+        && (!('sunoPerformanceTips' in data) || (data.sunoPerformanceTips is list && data.sunoPerformanceTips.size() <= 12 && (data.sunoPerformanceTips.size() == 0 || data.sunoPerformanceTips[0] is string)))
+        && (!('modernizationReplacements' in data) || (data.modernizationReplacements is list && data.modernizationReplacements.size() <= 30 && (data.modernizationReplacements.size() == 0 || data.modernizationReplacements[0] is map)))
+        && (!('qcReport' in data) || data.qcReport is map)
+        && (!('validationReport' in data) || data.validationReport is map);
+    }
+
+    // Validation Blueprint: KnowledgeVaultItem
+    function isValidKnowledgeVaultItem(data) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'category', 'title', 'sourceDoc',
+          'summary', 'stylePrompt', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'category', 'title', 'sourceDoc',
+          'summary', 'stylePrompt', 'sampleLyrics', 'tags',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.category is string && data.category.size() <= 64
+        && data.category in ['golden-blueprint', 'viral-case-study', 'daily-archive', 'dsp-mastering', 'sunomv-style', 'custom-formula']
+        && data.title is string && data.title.size() <= 300
+        && data.sourceDoc is string && data.sourceDoc.size() <= 200
+        && data.summary is string && data.summary.size() <= 2000
+        && data.stylePrompt is string && data.stylePrompt.size() <= 1000
+        && (!('sampleLyrics' in data) || (data.sampleLyrics is string && data.sampleLyrics.size() <= 15000))
+        && (!('tags' in data) || (data.tags is list && data.tags.size() <= 20 && (data.tags.size() == 0 || data.tags[0] is string)))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn()
+        && isVerified()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == userId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn()
+        && isVerified()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName', 'email', 'photoURL', 'theme', 'fontSize', 'updatedAt'
+        ]);
+      allow delete: if false;
+
+      match /songs/{songId} {
+        allow get: if isSignedIn()
+          && isValidId(userId)
+          && isValidId(songId)
+          && isOwner(userId)
+          && existing().ownerId == request.auth.uid;
+
+        allow list: if isSignedIn()
+          && isOwner(userId)
+          && existing().ownerId == request.auth.uid;
+
+        allow create: if isSignedIn()
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(songId)
+          && isOwner(userId)
+          && isValidSongProject(incoming())
+          && incoming().id == songId
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+
+        allow update: if isSignedIn()
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(songId)
+          && isOwner(userId)
+          && isValidSongProject(incoming())
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'content', 'qcReport', 'updatedAt'
+          ]);
+
+        allow delete: if isSignedIn()
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(songId)
+          && isOwner(userId)
+          && existing().ownerId == request.auth.uid;
+      }
+
+      match /knowledge_vault/{itemId} {
+        allow get: if isSignedIn()
+          && isValidId(userId)
+          && isValidId(itemId)
+          && isOwner(userId)
+          && existing().ownerId == request.auth.uid;
+
+        allow list: if isSignedIn()
+          && isOwner(userId)
+          && existing().ownerId == request.auth.uid;
+
+        allow create: if isSignedIn()
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(itemId)
+          && isOwner(userId)
+          && isValidKnowledgeVaultItem(incoming())
+          && incoming().id == itemId
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+
+        allow update: if isSignedIn()
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(itemId)
+          && isOwner(userId)
+          && isValidKnowledgeVaultItem(incoming())
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'summary', 'stylePrompt', 'sampleLyrics', 'tags', 'updatedAt'
+          ]);
+
+        allow delete: if isSignedIn()
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(itemId)
+          && isOwner(userId)
+          && existing().ownerId == request.auth.uid;
+      }
+    }
+  }
+}

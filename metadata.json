@@ -1,0 +1,8 @@
+{
+  "name": "MUSIC AI GEN  BY MIX",
+  "description": "An advanced AI-powered Thai lyric generator optimized for Suno AI, featuring artist styles, genre selection, and poetic resonance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

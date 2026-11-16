@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "IBM Plex Sans Thai", "Kanit", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+:root, :root.theme-light {
+  --bg-primary: #F4F4F4;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F8F8F8;
+  --bg-card: #FFFFFF;
+  --border-custom: #E8E8E8;
+  --border-hover: #BDBDBD;
+  --text-primary: #111111;
+  --text-muted: #777777;
+  --accent-primary: #111111;
+  --accent-success: #36A66A;
+}
+
+:root.theme-charcoal {
+  --bg-primary: #0b0d12;
+  --bg-secondary: #12151c;
+  --bg-tertiary: #191e28;
+  --bg-card: rgba(22, 27, 36, 0.9);
+  --border-custom: rgba(148, 163, 184, 0.18);
+  --border-hover: rgba(148, 163, 184, 0.35);
+  --text-primary: #f1f3f5;
+  --text-muted: #94a3b8;
+}
+
+:root.theme-midnight {
+  --bg-primary: #080c14;
+  --bg-secondary: #0f1523;
+  --bg-tertiary: #151d30;
+  --bg-card: rgba(16, 23, 38, 0.9);
+  --border-custom: rgba(56, 189, 248, 0.18);
+  --border-hover: rgba(56, 189, 248, 0.35);
+  --text-primary: #f1f5f9;
+  --text-muted: #94a3b8;
+}
+
+:root.theme-sunset {
+  --bg-primary: #120b09;
+  --bg-secondary: #1d120e;
+  --bg-tertiary: #271914;
+  --bg-card: rgba(33, 20, 16, 0.9);
+  --border-custom: rgba(249, 115, 22, 0.2);
+  --border-hover: rgba(249, 115, 22, 0.38);
+  --text-primary: #fef2f2;
+  --text-muted: #fca5a5;
+}
+
+:root.theme-neon {
+  --bg-primary: #0d0817;
+  --bg-secondary: #160e24;
+  --bg-tertiary: #201435;
+  --bg-card: rgba(27, 18, 45, 0.9);
+  --border-custom: rgba(217, 70, 239, 0.2);
+  --border-hover: rgba(217, 70, 239, 0.38);
+  --text-primary: #faf5ff;
+  --text-muted: #d8b4fe;
+}
+
+:root.theme-emerald {
+  --bg-primary: #08110e;
+  --bg-secondary: #0e1c17;
+  --bg-tertiary: #142821;
+  --bg-card: rgba(16, 33, 27, 0.9);
+  --border-custom: rgba(45, 138, 107, 0.22);
+  --border-hover: rgba(45, 138, 107, 0.4);
+  --text-primary: #f0f7f4;
+  --text-muted: #8cb8a6;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Monochrome Luxury Surfaces */
+.neurova-card {
+  background: #FFFFFF;
+  border: 1px solid #E8E8E8;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+}
+
+.neurova-subcard {
+  background: #F8F8F8;
+  border: 1px solid #E8E8E8;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.neurova-subcard:hover {
+  background: #FFFFFF;
+  border-color: #BDBDBD;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+}
+
+.neurova-btn-primary {
+  background: linear-gradient(180deg, #242424 0%, #111111 100%);
+  color: #FFFFFF;
+  border: 1px solid #111111;
+  box-shadow: 0 4px 14px rgba(17, 17, 17, 0.18);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.neurova-btn-primary:hover {
+  background: linear-gradient(180deg, #2E2E2E 0%, #1A1A1A 100%);
+  box-shadow: 0 6px 18px rgba(17, 17, 17, 0.25);
+}
