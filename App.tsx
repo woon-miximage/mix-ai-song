@@ -6,7 +6,7 @@ import { SongStyleModal } from './components/SongStyleModal';
 import { InspirationModal } from './components/InspirationModal';
 import { ViralKnowledgeModal } from './components/ViralKnowledgeModal';
 import { SongStylePreset, InspirationPreset } from './data/presetData';
-import { generateThaiLyrics } from './services/geminiService';
+import { generateThaiLyrics, testGeminiApiKey } from './services/geminiService';
 import { SettingsPanel } from './components/SettingsPanel';
 import PinLoginScreen from './components/PinLoginScreen';
 import { playAudioPreview, stopAudioPreview } from './services/audioService';
@@ -16,7 +16,7 @@ import {
   ArrowRight, X, Download, Trash2, Youtube, Facebook, ExternalLink,
   SlidersHorizontal, Flame, Star, BarChart2, Mic, Heart, Headphones,
   LayoutGrid, Lightbulb, Bell, Monitor, Shuffle, AudioWaveform, CheckCircle2, Globe, Cloud,
-  Key, Eye, EyeOff, Lock
+  Key, Eye, EyeOff, Lock, RefreshCw, Zap, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from 'firebase/auth';
@@ -112,6 +112,13 @@ const App: React.FC = () => {
     return '';
   });
   const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [isTestingKey, setIsTestingKey] = useState<boolean>(false);
+  const [keyTestResult, setKeyTestResult] = useState<{
+    ok: boolean;
+    latencyMs?: number;
+    modelsFound?: number;
+    error?: string;
+  } | null>(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -251,10 +258,29 @@ const App: React.FC = () => {
 
   const handleGeminiKeyChange = (val: string) => {
     setGeminiApiKey(val);
+    setKeyTestResult(null);
     try {
       localStorage.setItem('mix_gemini_api_key', val.trim());
     } catch {
       // ignore storage errors
+    }
+  };
+
+  const handleTestApiKey = async () => {
+    const clean = geminiApiKey.trim();
+    if (!clean) {
+      setKeyTestResult({ ok: false, error: 'กรุณากรอก API Key ก่อนกดทดสอบ' });
+      return;
+    }
+    setIsTestingKey(true);
+    setKeyTestResult(null);
+    try {
+      const res = await testGeminiApiKey(clean);
+      setKeyTestResult(res);
+    } catch (e: any) {
+      setKeyTestResult({ ok: false, error: e?.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ' });
+    } finally {
+      setIsTestingKey(false);
     }
   };
 
@@ -944,7 +970,7 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Gemini API Key Input Bar */}
-                <div className="bg-white border border-[#E8E8E8] rounded-xl p-2.5 space-y-1.5 shadow-2xs">
+                <div className="bg-white border border-[#E8E8E8] rounded-xl p-2.5 space-y-2 shadow-2xs">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-extrabold text-[#111111] flex items-center gap-1">
                       <Key size={12} className="text-[#3A56D4]" />
@@ -959,12 +985,13 @@ const App: React.FC = () => {
                       รับคีย์ฟรี <ExternalLink size={9} />
                     </a>
                   </div>
+
                   <div className="relative flex items-center">
                     <input
                       type={showGeminiKey ? 'text' : 'password'}
                       value={geminiApiKey}
                       onChange={(e) => handleGeminiKeyChange(e.target.value)}
-                      placeholder="AIzaSyxxxxxxxxxxxxxxxxxxxx"
+                      placeholder="AQ.xxxxxxxxxxxxxxxxxxxx (หรือ AIzaSy...)"
                       className="w-full bg-[#F8F8F8] border border-[#E0E0E0] focus:border-[#111111] focus:bg-white text-[11px] font-mono rounded-lg pl-2.5 pr-8 py-1.5 outline-none transition"
                     />
                     <button
@@ -976,15 +1003,72 @@ const App: React.FC = () => {
                       {showGeminiKey ? <EyeOff size={13} /> : <Eye size={13} />}
                     </button>
                   </div>
-                  <p className="text-[9px] text-[#777777] leading-tight">
-                    {geminiApiKey.trim() ? (
-                      <span className="text-[#36A66A] font-bold">✓ พร้อมใช้งานทั้ง 3.8 Flash และ 3.5 Flash สำรอง</span>
-                    ) : aiEngineStatus?.geminiReady ? (
-                      'มีคีย์เซิร์ฟเวอร์พร้อมใช้งาน (หรือระบุคีย์ส่วนตัวที่นี่เพื่อใช้โควต้าตนเอง)'
-                    ) : (
-                      <span className="text-amber-600 font-bold">⚠️ กรุณาใส่ Gemini API Key เพื่อเริ่มสร้างเพลง</span>
-                    )}
-                  </p>
+
+                  {/* Test Key Button + Note */}
+                  <div className="flex items-center justify-between gap-1.5 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={handleTestApiKey}
+                      disabled={isTestingKey}
+                      className="px-2.5 py-1 rounded-lg bg-[#F0F4FF] hover:bg-[#E3EBFF] border border-[#D0DEFF] text-[#2F4DBE] text-[10px] font-bold flex items-center gap-1 transition cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      {isTestingKey ? (
+                        <>
+                          <RefreshCw size={11} className="animate-spin text-[#2F4DBE]" />
+                          <span>กำลังตรวจสอบ...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap size={11} className="text-[#2F4DBE]" />
+                          <span>⚡ ทดสอบคีย์</span>
+                        </>
+                      )}
+                    </button>
+                    <span className="text-[9px] text-[#777777] text-right truncate">
+                      รองรับคีย์รุ่นใหม่ (AQ.) และรุ่นเดิม (AIzaSy)
+                    </span>
+                  </div>
+
+                  {/* Key Test Result Feedback */}
+                  {keyTestResult && (
+                    <div
+                      className={`p-2 rounded-lg text-[10px] flex items-start gap-1.5 leading-snug border ${
+                        keyTestResult.ok
+                          ? 'bg-[#EBFBF2] text-[#1E7E44] border-[#B7ECC8]'
+                          : 'bg-[#FFF2F2] text-[#D32F2F] border-[#FFCDCD]'
+                      }`}
+                    >
+                      {keyTestResult.ok ? (
+                        <>
+                          <CheckCircle2 size={13} className="text-[#1E7E44] shrink-0 mt-0.5" />
+                          <div>
+                            <div className="font-bold">✓ คีย์ใช้งานได้สมบูรณ์ (Latency: {keyTestResult.latencyMs}ms)</div>
+                            <div className="text-[9px] opacity-80">พร้อมส่งคำสั่งไปยัง Gemini 3.8 Flash และระบบสำรอง 3.5 Flash</div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle size={13} className="text-[#D32F2F] shrink-0 mt-0.5" />
+                          <div>
+                            <div className="font-bold">✕ คีย์ไม่ถูกต้อง หรือเชื่อมต่อไม่ได้</div>
+                            <div className="text-[9px] opacity-90 break-all">{keyTestResult.error}</div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {!keyTestResult && (
+                    <p className="text-[9px] text-[#777777] leading-tight">
+                      {geminiApiKey.trim() ? (
+                        <span className="text-[#36A66A] font-bold">✓ พร้อมใช้งานทั้ง 3.8 Flash และ 3.5 Flash สำรอง</span>
+                      ) : aiEngineStatus?.geminiReady ? (
+                        'มีคีย์เซิร์ฟเวอร์พร้อมใช้งาน (หรือระบุคีย์ส่วนตัวที่นี่เพื่อใช้โควต้าตนเอง)'
+                      ) : (
+                        <span className="text-amber-600 font-bold">⚠️ กรุณาใส่ Gemini API Key เพื่อเริ่มสร้างเพลง</span>
+                      )}
+                    </p>
+                  )}
                 </div>
 
                 <button

@@ -62,16 +62,64 @@ async function postJsonWithWarmupRetry(url: string, payload: unknown, maxRetries
   throw lastError || new Error("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์สร้างเพลง");
 }
 
+// Test & validate Gemini API Key (Supports modern AQ... and legacy AIzaSy... keys)
+export async function testGeminiApiKey(apiKey: string): Promise<{
+  ok: boolean;
+  latencyMs?: number;
+  modelsFound?: number;
+  error?: string;
+}> {
+  const cleanKey = apiKey?.trim();
+  if (!cleanKey) {
+    return { ok: false, error: 'กรุณากรอก API Key ก่อนกดทดสอบ' };
+  }
+
+  const startTime = Date.now();
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(cleanKey)}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-goog-api-key': cleanKey,
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    const latencyMs = Date.now() - startTime;
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      const msg = errJson?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+      return { ok: false, latencyMs, error: msg };
+    }
+
+    const data = await res.json().catch(() => ({}));
+    const modelsCount = Array.isArray(data?.models) ? data.models.length : 0;
+    return {
+      ok: true,
+      latencyMs,
+      modelsFound: modelsCount,
+    };
+  } catch (err: any) {
+    const latencyMs = Date.now() - startTime;
+    return {
+      ok: false,
+      latencyMs,
+      error: err?.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ Google ได้ (Timeout หรือ เครือข่ายมีปัญหา)',
+    };
+  }
+}
+
 async function callGeminiDirect(
   promptText: string,
   apiKey: string
 ): Promise<{ text: string; engineUsed: string; fallbackApplied: boolean; fallbackReason?: string }> {
   const cleanKey = apiKey.trim();
-  // Primary model is Gemini 3.8 Flash; Backup is Gemini 3.5 Flash (same Gemini API Key)
+  // Primary model is Gemini 3.8 Flash; Backup is Gemini 3.5 Flash; with Flash Lite fallbacks
   const models = [
     { name: 'gemini-3.8-flash', isPrimary: true, timeout: 50000 },
     { name: 'gemini-3.5-flash', isPrimary: false, timeout: 50000 },
-    { name: 'gemini-flash-latest', isPrimary: false, timeout: 40000 },
+    { name: 'gemini-3.5-flash-lite', isPrimary: false, timeout: 40000 },
     { name: 'gemini-flash-lite-latest', isPrimary: false, timeout: 35000 }
   ];
 
@@ -81,10 +129,13 @@ async function callGeminiDirect(
   for (const m of models) {
     for (let attempt = 0; attempt <= 1; attempt++) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${m.name}:generateContent?key=${cleanKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${m.name}:generateContent?key=${encodeURIComponent(cleanKey)}`;
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': cleanKey,
+          },
           body: JSON.stringify({
             contents: [{ parts: [{ text: promptText }] }],
             generationConfig: {
@@ -146,7 +197,7 @@ async function generateDirectFromBrowser(
 ): Promise<{ text: string; engineUsed: string; fallbackApplied: boolean; fallbackReason?: string }> {
   const cleanGeminiKey = geminiKey?.trim();
   if (!cleanGeminiKey) {
-    throw new Error('กรุณาระบุ Gemini API Key (AIzaSy...) ในแถบตั้งค่าโมเดลด้านซ้ายก่อนเริ่มสร้างเพลง');
+    throw new Error('กรุณาระบุ Gemini API Key (ขึ้นต้นด้วย AQ. หรือ AIzaSy) ในแถบตั้งค่าโมเดลด้านซ้ายก่อนเริ่มสร้างเพลง');
   }
 
   return await callGeminiDirect(promptText, cleanGeminiKey);

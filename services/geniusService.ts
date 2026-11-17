@@ -62,7 +62,6 @@ export async function auditOriginalityAndStructureQc(params: {
   theme?: string;
   aiEngine?: AiEngineId;
   geminiApiKey?: string;
-  deepseekApiKey?: string;
   customApiKey?: string;
 }): Promise<{ qcReport: GeniusQcReport; refinedLyrics?: string }> {
   const {
@@ -71,9 +70,8 @@ export async function auditOriginalityAndStructureQc(params: {
     artistReference = '',
     genre,
     theme = '',
-    aiEngine = 'deepseek-v4-pro',
+    aiEngine = 'gemini-3.8-flash',
     geminiApiKey,
-    deepseekApiKey,
     customApiKey,
   } = params;
 
@@ -132,7 +130,6 @@ export async function auditOriginalityAndStructureQc(params: {
         auditPrompt,
         aiEngine,
         geminiApiKey,
-        deepseekApiKey,
         customApiKey,
       }),
     });
