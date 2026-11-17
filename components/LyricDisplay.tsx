@@ -113,7 +113,6 @@ const LyricDisplay: React.FC<LyricDisplayProps> = ({
         genre: lyric.input.genre,
         theme: lyric.input.theme,
         aiEngine: lyric.input?.aiEngine,
-        deepseekApiKey: lyric.input?.deepseekApiKey,
         geminiApiKey: lyric.input?.geminiApiKey,
         customApiKey: lyric.input?.customApiKey,
       });

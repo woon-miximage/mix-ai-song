@@ -4,7 +4,7 @@ export type LanguageMode = 'Thai Only' | 'Thai-English Mix' | 'English Only';
 export type EnglishMixRatio = 25 | 50 | 75;
 export type SunoModelTier = 'v6' | 'v6-wild' | 'v6-mini';
 export type SongwritingMode = 'auto' | 'storytelling' | 'emotional' | 'hybrid';
-export type AiEngineId = 'gemini-3.8-flash' | 'deepseek-v4-pro';
+export type AiEngineId = 'gemini-3.8-flash';
 
 export interface SongLengthConfig {
   id: SongLength;
@@ -90,7 +90,6 @@ export interface SongInput {
   aiEngine?: AiEngineId;
   customApiKey?: string;
   geminiApiKey?: string;
-  deepseekApiKey?: string;
 }
 
 export interface PresetSyncPayload {

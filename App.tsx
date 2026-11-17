@@ -102,31 +102,16 @@ const App: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageMode>('Thai Only');
   const [englishMixRatio, setEnglishMixRatio] = useState<EnglishMixRatio>(25);
 
-  const [selectedAiEngine, setSelectedAiEngine] = useState<AiEngineId>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('mix_ai_engine');
-      if (saved === 'deepseek-v4-pro' || saved === 'gemini-3.8-flash') return saved;
-    }
-    return 'deepseek-v4-pro';
-  });
-  const [draftAiEngine, setDraftAiEngine] = useState<AiEngineId>(selectedAiEngine);
-  const [aiEngineStatus, setAiEngineStatus] = useState<{ geminiReady: boolean; deepseekReady: boolean } | null>(null);
+  const selectedAiEngine: AiEngineId = 'gemini-3.8-flash';
+  const [aiEngineStatus, setAiEngineStatus] = useState<{ geminiReady: boolean } | null>(null);
   const [aiEngineSavedNotice, setAiEngineSavedNotice] = useState<string | null>(null);
-  const [deepseekApiKey, setDeepseekApiKey] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('mix_deepseek_api_key') || '';
-    }
-    return '';
-  });
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('mix_gemini_api_key') || '';
     }
     return '';
   });
-  const [showDeepseekKey, setShowDeepseekKey] = useState(false);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
-  const [showSecondaryKeyInput, setShowSecondaryKeyInput] = useState(false);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -252,7 +237,6 @@ const App: React.FC = () => {
         if (active && data?.ok && data?.engines) {
           setAiEngineStatus({
             geminiReady: Boolean(data.engines['gemini-3.8-flash']?.ready),
-            deepseekReady: Boolean(data.engines['deepseek-v4-pro']?.ready),
           });
         }
       } catch {
@@ -265,25 +249,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const handleSelectAiEngine = (engine: AiEngineId) => {
-    setSelectedAiEngine(engine);
-    setDraftAiEngine(engine);
-    try {
-      localStorage.setItem('mix_ai_engine', engine);
-    } catch {
-      // ignore storage errors
-    }
-  };
-
-  const handleDeepseekKeyChange = (val: string) => {
-    setDeepseekApiKey(val);
-    try {
-      localStorage.setItem('mix_deepseek_api_key', val.trim());
-    } catch {
-      // ignore storage errors
-    }
-  };
-
   const handleGeminiKeyChange = (val: string) => {
     setGeminiApiKey(val);
     try {
@@ -294,21 +259,15 @@ const App: React.FC = () => {
   };
 
   const handleSaveAiEngine = () => {
-    setSelectedAiEngine(draftAiEngine);
     try {
-      localStorage.setItem('mix_ai_engine', draftAiEngine);
-      localStorage.setItem('mix_deepseek_api_key', deepseekApiKey.trim());
       localStorage.setItem('mix_gemini_api_key', geminiApiKey.trim());
     } catch {
       // ignore storage errors
     }
     setIsLyricModalOpen(false);
     setTuneSongData(null);
-    const label = draftAiEngine === 'deepseek-v4-pro' ? 'DeepSeek-V4-Pro (หลัก)' : 'Gemini 3.8 Flash (สำรอง)';
-    const keyDetail = draftAiEngine === 'deepseek-v4-pro'
-      ? (deepseekApiKey.trim() ? 'พร้อมคีย์ DeepSeek ส่วนตัว' : 'ใช้คีย์ระบบ')
-      : (geminiApiKey.trim() ? 'พร้อมคีย์ Gemini ส่วนตัว' : 'ใช้คีย์ระบบ');
-    setAiEngineSavedNotice(`✓ บันทึก ${label} • ${keyDetail} เรียบร้อย พร้อมใช้งานทันที`);
+    const keyDetail = geminiApiKey.trim() ? 'พร้อมคีย์ส่วนตัว' : 'พร้อมใช้งาน';
+    setAiEngineSavedNotice(`✓ บันทึกคีย์ Gemini 3.8 Flash • ${keyDetail} เรียบร้อย พร้อมใช้งานทันที`);
     setTimeout(() => {
       setAiEngineSavedNotice(null);
     }, 3500);
@@ -486,10 +445,9 @@ const App: React.FC = () => {
         ...input,
         language: input.language || selectedLanguage,
         englishMixRatio: input.englishMixRatio || englishMixRatio,
-        aiEngine: selectedAiEngine,
-        deepseekApiKey: deepseekApiKey.trim() || undefined,
+        aiEngine: 'gemini-3.8-flash',
         geminiApiKey: geminiApiKey.trim() || undefined,
-        customApiKey: (selectedAiEngine === 'deepseek-v4-pro' ? deepseekApiKey : geminiApiKey).trim() || undefined,
+        customApiKey: geminiApiKey.trim() || undefined,
       };
       const generated = await generateThaiLyrics(finalInput);
       const newLyric: GeneratedLyric = {
@@ -945,207 +903,88 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* AI Engine Selector Card (DeepSeek-V4-Pro หลัก & Gemini 3.8 Flash สำรอง + Custom API Input Bar) */}
+              {/* AI Engine Settings Card (Gemini 3.8 Flash หลัก / 3.5 Flash สำรอง) */}
               <div className="neurova-subcard p-3 rounded-2xl space-y-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-extrabold text-[#111111] flex items-center gap-1.5">
                     <Cpu size={14} className="text-[#111111]" />
-                    ตั้งค่า AI Engine
+                    ตั้งค่า AI Engine (Gemini)
                   </span>
                   <span className="text-[10px] font-bold text-[#111111] bg-white border border-[#E8E8E8] px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-2xs">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#36A66A]" />
-                    {selectedAiEngine === 'deepseek-v4-pro' ? 'DeepSeek-V4-Pro (หลัก)' : 'Gemini 3.8 Flash (สำรอง)'}
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#36A66A] animate-pulse" />
+                    Gemini 3.8 Flash
                   </span>
                 </div>
 
-                {/* Model Selector Buttons */}
+                {/* Gemini 3.8 Flash & 3.5 Flash Dual Engine Badge */}
                 <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectAiEngine('deepseek-v4-pro')}
-                    className={`p-2 rounded-xl border text-left transition cursor-pointer ${
-                      draftAiEngine === 'deepseek-v4-pro'
-                        ? 'bg-[#111111] text-white border-[#111111] shadow-xs'
-                        : 'bg-white text-[#111111] border-[#E8E8E8] hover:border-[#CCCCCC]'
-                    }`}
-                  >
+                  <div className="p-2 rounded-xl bg-[#111111] text-white shadow-xs border border-[#111111]">
                     <div className="flex items-center justify-between gap-1">
-                      <div className="text-[11px] font-extrabold leading-tight">DeepSeek-V4-Pro</div>
-                      <span className={`text-[8px] font-extrabold px-1 py-0.2 rounded ${
-                        draftAiEngine === 'deepseek-v4-pro' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      }`}>
+                      <div className="text-[11px] font-extrabold leading-tight">3.8 Flash</div>
+                      <span className="text-[8px] font-extrabold bg-[#36A66A] text-white px-1 py-0.2 rounded">
                         หลัก
                       </span>
                     </div>
-                    <div
-                      className={`text-[9px] mt-1 flex items-center gap-1 ${
-                        draftAiEngine === 'deepseek-v4-pro' ? 'text-white/80' : 'text-[#777777]'
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          deepseekApiKey.trim() || aiEngineStatus?.deepseekReady ? 'bg-[#36A66A]' : 'bg-amber-400'
-                        }`}
-                      />
-                      {deepseekApiKey.trim()
-                        ? 'ใช้คีย์ส่วนตัว'
-                        : aiEngineStatus?.deepseekReady
-                        ? 'คีย์ระบบพร้อมใช้'
-                        : 'กดเพื่อใส่คีย์'}
+                    <div className="text-[9px] text-white/70 mt-0.5 leading-tight">
+                      ประมวลผลสูงสุด
                     </div>
-                  </button>
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleSelectAiEngine('gemini-3.8-flash')}
-                    className={`p-2 rounded-xl border text-left transition cursor-pointer ${
-                      draftAiEngine === 'gemini-3.8-flash'
-                        ? 'bg-[#111111] text-white border-[#111111] shadow-xs'
-                        : 'bg-white text-[#111111] border-[#E8E8E8] hover:border-[#CCCCCC]'
-                    }`}
-                  >
+                  <div className="p-2 rounded-xl bg-white text-[#111111] border border-[#E8E8E8]">
                     <div className="flex items-center justify-between gap-1">
-                      <div className="text-[11px] font-extrabold leading-tight">Gemini 3.8 Flash</div>
-                      <span className={`text-[8px] font-extrabold px-1 py-0.2 rounded ${
-                        draftAiEngine === 'gemini-3.8-flash' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700 border border-blue-200'
-                      }`}>
+                      <div className="text-[11px] font-extrabold leading-tight">3.5 Flash</div>
+                      <span className="text-[8px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 px-1 py-0.2 rounded">
                         สำรอง
                       </span>
                     </div>
-                    <div
-                      className={`text-[9px] mt-1 flex items-center gap-1 ${
-                        draftAiEngine === 'gemini-3.8-flash' ? 'text-white/80' : 'text-[#777777]'
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          geminiApiKey.trim() || aiEngineStatus?.geminiReady ? 'bg-[#36A66A]' : 'bg-amber-400'
-                        }`}
-                      />
-                      {geminiApiKey.trim()
-                        ? 'ใช้คีย์ส่วนตัว'
-                        : aiEngineStatus?.geminiReady
-                        ? 'คีย์ระบบพร้อมใช้'
-                        : 'กดเพื่อใส่คีย์'}
+                    <div className="text-[9px] text-[#777777] mt-0.5 leading-tight">
+                      สลับอัตโนมัติ
                     </div>
-                  </button>
+                  </div>
                 </div>
 
-                {/* API Key Input Drawer for the Selected Model */}
-                <div className="bg-white border border-[#E8E8E8] rounded-xl p-2.5 space-y-2 shadow-2xs">
-                  {draftAiEngine === 'deepseek-v4-pro' ? (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-extrabold text-[#111111] flex items-center gap-1">
-                          <Key size={12} className="text-[#36A66A]" />
-                          DeepSeek API Key (สำหรับโมเดลหลัก)
-                        </label>
-                        <span className="text-[9px] text-[#777777]">
-                          {deepseekApiKey.trim() ? 'คีย์ส่วนตัว' : (aiEngineStatus?.deepseekReady ? 'ใช้คีย์ระบบ' : 'จำเป็น')}
-                        </span>
-                      </div>
-                      <div className="relative flex items-center">
-                        <input
-                          type={showDeepseekKey ? 'text' : 'password'}
-                          value={deepseekApiKey}
-                          onChange={(e) => handleDeepseekKeyChange(e.target.value)}
-                          placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
-                          className="w-full bg-[#F8F8F8] border border-[#E0E0E0] focus:border-[#111111] focus:bg-white text-[11px] font-mono rounded-lg pl-2.5 pr-8 py-1.5 outline-none transition"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowDeepseekKey(!showDeepseekKey)}
-                          className="absolute right-2 text-[#888888] hover:text-[#111111] cursor-pointer"
-                          title={showDeepseekKey ? 'ซ่อนคีย์' : 'แสดงคีย์'}
-                        >
-                          {showDeepseekKey ? <EyeOff size={13} /> : <Eye size={13} />}
-                        </button>
-                      </div>
-                      <p className="text-[9px] text-[#777777] leading-tight">
-                        {deepseekApiKey.trim() ? (
-                          <span className="text-[#36A66A] font-bold">✓ ใช้คีย์ส่วนตัวนี้ในการประมวลผลโมเดลหลัก</span>
-                        ) : aiEngineStatus?.deepseekReady ? (
-                          'มีคีย์เซิร์ฟเวอร์พร้อมใช้งาน (หรือระบุคีย์ส่วนตัวที่นี่เพื่อใช้โควต้าตนเอง)'
-                        ) : (
-                          <span className="text-amber-600 font-bold">⚠️ ยังไม่มีคีย์ในระบบ กรุณาใส่ API Key ของคุณเพื่อเริ่มงาน</span>
-                        )}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-extrabold text-[#111111] flex items-center gap-1">
-                          <Key size={12} className="text-[#3A56D4]" />
-                          Gemini API Key (สำหรับโมเดลสำรอง)
-                        </label>
-                        <span className="text-[9px] text-[#777777]">
-                          {geminiApiKey.trim() ? 'คีย์ส่วนตัว' : (aiEngineStatus?.geminiReady ? 'ใช้คีย์ระบบ' : 'จำเป็น')}
-                        </span>
-                      </div>
-                      <div className="relative flex items-center">
-                        <input
-                          type={showGeminiKey ? 'text' : 'password'}
-                          value={geminiApiKey}
-                          onChange={(e) => handleGeminiKeyChange(e.target.value)}
-                          placeholder="AIzaSyxxxxxxxxxxxxxxxxxxxx"
-                          className="w-full bg-[#F8F8F8] border border-[#E0E0E0] focus:border-[#111111] focus:bg-white text-[11px] font-mono rounded-lg pl-2.5 pr-8 py-1.5 outline-none transition"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowGeminiKey(!showGeminiKey)}
-                          className="absolute right-2 text-[#888888] hover:text-[#111111] cursor-pointer"
-                          title={showGeminiKey ? 'ซ่อนคีย์' : 'แสดงคีย์'}
-                        >
-                          {showGeminiKey ? <EyeOff size={13} /> : <Eye size={13} />}
-                        </button>
-                      </div>
-                      <p className="text-[9px] text-[#777777] leading-tight">
-                        {geminiApiKey.trim() ? (
-                          <span className="text-[#36A66A] font-bold">✓ ใช้คีย์ส่วนตัวนี้ในการประมวลผล</span>
-                        ) : aiEngineStatus?.geminiReady ? (
-                          'มีคีย์เซิร์ฟเวอร์พร้อมใช้งาน (หรือระบุคีย์ส่วนตัวที่นี่เพื่อใช้โควต้าตนเอง)'
-                        ) : (
-                          <span className="text-amber-600 font-bold">⚠️ ยังไม่มีคีย์ในระบบ กรุณาใส่ API Key ของคุณเพื่อเริ่มงาน</span>
-                        )}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Secondary Key Expandable Section */}
-                  <div className="pt-1 border-t border-[#F0F0F0]">
+                {/* Gemini API Key Input Bar */}
+                <div className="bg-white border border-[#E8E8E8] rounded-xl p-2.5 space-y-1.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-extrabold text-[#111111] flex items-center gap-1">
+                      <Key size={12} className="text-[#3A56D4]" />
+                      Gemini API Key (Google AI Studio)
+                    </label>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[9px] text-[#3A56D4] hover:underline font-semibold flex items-center gap-0.5"
+                    >
+                      รับคีย์ฟรี <ExternalLink size={9} />
+                    </a>
+                  </div>
+                  <div className="relative flex items-center">
+                    <input
+                      type={showGeminiKey ? 'text' : 'password'}
+                      value={geminiApiKey}
+                      onChange={(e) => handleGeminiKeyChange(e.target.value)}
+                      placeholder="AIzaSyxxxxxxxxxxxxxxxxxxxx"
+                      className="w-full bg-[#F8F8F8] border border-[#E0E0E0] focus:border-[#111111] focus:bg-white text-[11px] font-mono rounded-lg pl-2.5 pr-8 py-1.5 outline-none transition"
+                    />
                     <button
                       type="button"
-                      onClick={() => setShowSecondaryKeyInput(!showSecondaryKeyInput)}
-                      className="text-[9px] font-bold text-[#555555] hover:text-[#111111] flex items-center gap-1 cursor-pointer transition"
+                      onClick={() => setShowGeminiKey(!showGeminiKey)}
+                      className="absolute right-2 text-[#888888] hover:text-[#111111] cursor-pointer"
+                      title={showGeminiKey ? 'ซ่อนคีย์' : 'แสดงคีย์'}
                     >
-                      <span>{showSecondaryKeyInput ? '▼ ซ่อนการตั้งค่าคีย์อีกโมเดล' : `▶ ตั้งค่าคีย์ ${draftAiEngine === 'deepseek-v4-pro' ? 'Gemini 3.8 Flash (สำรอง)' : 'DeepSeek-V4-Pro (หลัก)'}`}</span>
+                      {showGeminiKey ? <EyeOff size={13} /> : <Eye size={13} />}
                     </button>
-
-                    {showSecondaryKeyInput && (
-                      <div className="mt-1.5 pt-1.5 border-t border-dashed border-[#E8E8E8] space-y-1">
-                        <label className="text-[9px] font-bold text-[#444444] flex items-center gap-1">
-                          <Key size={11} className="text-[#777777]" />
-                          {draftAiEngine === 'deepseek-v4-pro' ? 'Gemini API Key (สำรอง):' : 'DeepSeek API Key (หลัก):'}
-                        </label>
-                        <div className="relative flex items-center">
-                          <input
-                            type={draftAiEngine === 'deepseek-v4-pro' ? (showGeminiKey ? 'text' : 'password') : (showDeepseekKey ? 'text' : 'password')}
-                            value={draftAiEngine === 'deepseek-v4-pro' ? geminiApiKey : deepseekApiKey}
-                            onChange={(e) => draftAiEngine === 'deepseek-v4-pro' ? handleGeminiKeyChange(e.target.value) : handleDeepseekKeyChange(e.target.value)}
-                            placeholder={draftAiEngine === 'deepseek-v4-pro' ? 'AIzaSyxxxxxxxxxxxxxxxxxxxx' : 'sk-xxxxxxxxxxxxxxxxxxxxxxxx'}
-                            className="w-full bg-[#F8F8F8] border border-[#E0E0E0] focus:border-[#111111] focus:bg-white text-[10px] font-mono rounded-lg pl-2 pr-7 py-1 outline-none transition"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => draftAiEngine === 'deepseek-v4-pro' ? setShowGeminiKey(!showGeminiKey) : setShowDeepseekKey(!showDeepseekKey)}
-                            className="absolute right-2 text-[#888888] hover:text-[#111111] cursor-pointer"
-                          >
-                            {(draftAiEngine === 'deepseek-v4-pro' ? showGeminiKey : showDeepseekKey) ? <EyeOff size={11} /> : <Eye size={11} />}
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
+                  <p className="text-[9px] text-[#777777] leading-tight">
+                    {geminiApiKey.trim() ? (
+                      <span className="text-[#36A66A] font-bold">✓ พร้อมใช้งานทั้ง 3.8 Flash และ 3.5 Flash สำรอง</span>
+                    ) : aiEngineStatus?.geminiReady ? (
+                      'มีคีย์เซิร์ฟเวอร์พร้อมใช้งาน (หรือระบุคีย์ส่วนตัวที่นี่เพื่อใช้โควต้าตนเอง)'
+                    ) : (
+                      <span className="text-amber-600 font-bold">⚠️ กรุณาใส่ Gemini API Key เพื่อเริ่มสร้างเพลง</span>
+                    )}
+                  </p>
                 </div>
 
                 <button
@@ -1154,11 +993,7 @@ const App: React.FC = () => {
                   className="w-full py-2 px-3 rounded-xl bg-[#111111] hover:bg-[#222222] text-white text-[11px] font-extrabold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
                 >
                   <CheckCircle2 size={13} />
-                  <span>
-                    {draftAiEngine !== selectedAiEngine || deepseekApiKey || geminiApiKey
-                      ? 'บันทึกและเริ่มงานทันที'
-                      : 'บันทึกตั้งค่า • พร้อมเริ่มงานทันที'}
-                  </span>
+                  <span>บันทึกคีย์ • พร้อมเริ่มงานทันที</span>
                 </button>
 
                 {aiEngineSavedNotice ? (
@@ -1166,8 +1001,8 @@ const App: React.FC = () => {
                     {aiEngineSavedNotice}
                   </p>
                 ) : (
-                  <p className="text-[9px] text-[#777777] leading-snug">
-                    หลัก: <span className="font-bold text-[#111111]">DeepSeek-V4-Pro</span> | สำรอง: <span className="font-bold text-[#111111]">Gemini 3.8 Flash</span> (สลับสำรองอัตโนมัติหาก DeepSeek ขัดข้อง)
+                  <p className="text-[9px] text-[#777777] leading-snug text-center">
+                    หลัก: <span className="font-bold text-[#111111]">Gemini 3.8 Flash</span> | สำรอง: <span className="font-bold text-[#111111]">Gemini 3.5 Flash</span> (ใช้คีย์เดียวกัน)
                   </p>
                 )}
               </div>

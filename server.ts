@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 
 const PORT = 3000;
 
-type AiEngineId = 'gemini-3.8-flash' | 'deepseek-v4-pro';
+type AiEngineId = 'gemini-3.8-flash';
 
 function isConfiguredSecret(val: string | undefined): boolean {
   return Boolean(val && val.trim() !== '' && val !== 'undefined' && val !== 'PLACEHOLDER_API_KEY');
@@ -80,100 +80,12 @@ function buildJsonKeyHint(schema: Schema): string {
   return `Return strictly valid JSON object with these keys:\n{\n  ${keys.join('\n  ')}\n}`;
 }
 
-async function generateWithDeepSeek(
-  contents: string,
-  responseSchema: Schema,
-  customApiKey?: string
-): Promise<string> {
-  const apiKey = (customApiKey && isConfiguredSecret(customApiKey))
-    ? customApiKey.trim()
-    : process.env.DEEPSEEK_API_KEY;
-  if (!isConfiguredSecret(apiKey)) {
-    throw new Error('DEEPSEEK_API_KEY_NOT_CONFIGURED');
-  }
-
-  const baseUrl = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/+$/, '');
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro';
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 55000);
-
-  try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey!.trim()}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: `You are an elite commercial songwriter, Suno v6 architect, and music QC inspector. Respond ONLY with a valid JSON object matching the schema below.\n\n${buildJsonKeyHint(responseSchema)}`,
-          },
-          {
-            role: 'user',
-            content: contents,
-          },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.75,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => '');
-      throw new Error(`DeepSeek API error (${response.status}): ${errBody.slice(0, 180)}`);
-    }
-
-    const data: any = await response.json();
-    const rawText = (data?.choices?.[0]?.message?.content || '').trim();
-    if (!rawText) {
-      throw new Error('DeepSeek API returned empty response');
-    }
-
-    // Verify valid JSON before returning
-    const cleaned = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '').trim();
-    JSON.parse(cleaned);
-    return cleaned;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
 async function runAiGeneration(params: {
   aiEngine?: AiEngineId;
   contents: string;
   responseSchema: Schema;
   geminiApiKey?: string;
-  deepseekApiKey?: string;
 }): Promise<{ text: string; engineUsed: string; fallbackApplied: boolean; fallbackReason?: string }> {
-  // Default to deepseek-v4-pro as primary unless gemini-3.8-flash is explicitly selected
-  const requestedEngine: AiEngineId = params.aiEngine === 'gemini-3.8-flash' ? 'gemini-3.8-flash' : 'deepseek-v4-pro';
-
-  if (requestedEngine === 'deepseek-v4-pro') {
-    try {
-      const text = await generateWithDeepSeek(params.contents, params.responseSchema, params.deepseekApiKey);
-      return {
-        text,
-        engineUsed: 'deepseek-v4-pro',
-        fallbackApplied: false,
-      };
-    } catch (dsErr: any) {
-      const reason = dsErr?.message || 'DeepSeek unavailable';
-      console.warn('[Server AI] DeepSeek-V4-Pro failed, auto-falling back to Gemini 3.8 Flash:', reason);
-      const ai = getGeminiClient(params.geminiApiKey);
-      const geminiRes = await generateWithGeminiResilience(ai, params.contents, params.responseSchema);
-      return {
-        text: geminiRes.text,
-        engineUsed: geminiRes.engineUsed,
-        fallbackApplied: true,
-        fallbackReason: reason,
-      };
-    }
-  }
-
   const ai = getGeminiClient(params.geminiApiKey);
   const geminiRes = await generateWithGeminiResilience(ai, params.contents, params.responseSchema);
   return {
@@ -417,52 +329,42 @@ async function startServer() {
   app.get('/api/ai/status', (_req, res) => {
     res.json({
       ok: true,
-      defaultEngine: 'deepseek-v4-pro',
-      fallbackEngine: 'gemini-3.8-flash',
+      defaultEngine: 'gemini-3.8-flash',
       engines: {
-        'deepseek-v4-pro': {
-          ready: isConfiguredSecret(process.env.DEEPSEEK_API_KEY),
-          label: 'DeepSeek-V4-Pro (หลัก)',
-          provider: 'DeepSeek API',
-          role: 'primary',
-        },
         'gemini-3.8-flash': {
           ready: isConfiguredSecret(process.env.GEMINI_API_KEY),
-          label: 'Gemini 3.8 Flash (สำรอง)',
+          label: 'Gemini 3.8 Flash (โมเดลหลัก)',
           provider: 'Google Gemini',
-          role: 'fallback',
+          role: 'primary',
         },
       },
-      autoFallback: true,
+      autoFallback: false,
     });
   });
 
-  // 2. Server-Side AI Songwriting Endpoint (DeepSeek-V4-Pro หลัก / Gemini 3.8 Flash สำรอง + User Key Injection)
+  // 2. Server-Side AI Songwriting Endpoint (Gemini 3.8 Flash + User Key Injection)
   app.post('/api/gemini/generate-lyrics', async (req, res) => {
     try {
-      const { promptText, aiEngine, geminiApiKey, deepseekApiKey, customApiKey } = req.body || {};
+      const { promptText, geminiApiKey, customApiKey } = req.body || {};
       if (!promptText || typeof promptText !== 'string') {
         res.status(400).json({ error: 'ไม่พบข้อมูล Prompt สำหรับสร้างเนื้อเพลง' });
         return;
       }
 
-      const effectiveGeminiKey = geminiApiKey || (aiEngine === 'gemini-3.8-flash' ? customApiKey : undefined);
-      const effectiveDeepseekKey = deepseekApiKey || (aiEngine === 'deepseek-v4-pro' ? customApiKey : undefined);
+      const effectiveGeminiKey = geminiApiKey || customApiKey;
 
       const result = await runAiGeneration({
-        aiEngine,
+        aiEngine: 'gemini-3.8-flash',
         contents: promptText,
         responseSchema: LYRIC_RESPONSE_SCHEMA,
         geminiApiKey: effectiveGeminiKey,
-        deepseekApiKey: effectiveDeepseekKey,
       });
 
       res.status(200).json({
         ok: true,
         text: result.text,
         engineUsed: result.engineUsed,
-        fallbackApplied: result.fallbackApplied,
-        fallbackReason: result.fallbackReason,
+        fallbackApplied: false,
       });
     } catch (error: any) {
       console.error('[Server AI Generate Error]:', error);
@@ -473,24 +375,22 @@ async function startServer() {
     }
   });
 
-  // 3. Server-Side AI QC & Originality Audit Endpoint (DeepSeek-V4-Pro หลัก / Gemini 3.8 Flash สำรอง + User Key Injection)
+  // 3. Server-Side AI QC & Originality Audit Endpoint (Gemini 3.8 Flash + User Key Injection)
   app.post('/api/gemini/qc-audit', async (req, res) => {
     try {
-      const { auditPrompt, aiEngine, geminiApiKey, deepseekApiKey, customApiKey } = req.body || {};
+      const { auditPrompt, geminiApiKey, customApiKey } = req.body || {};
       if (!auditPrompt || typeof auditPrompt !== 'string') {
         res.status(400).json({ error: 'ไม่พบข้อมูลสำหรับตรวจสอบ QC' });
         return;
       }
 
-      const effectiveGeminiKey = geminiApiKey || (aiEngine === 'gemini-3.8-flash' ? customApiKey : undefined);
-      const effectiveDeepseekKey = deepseekApiKey || (aiEngine === 'deepseek-v4-pro' ? customApiKey : undefined);
+      const effectiveGeminiKey = geminiApiKey || customApiKey;
 
       const result = await runAiGeneration({
-        aiEngine,
+        aiEngine: 'gemini-3.8-flash',
         contents: auditPrompt,
         responseSchema: QC_RESPONSE_SCHEMA,
         geminiApiKey: effectiveGeminiKey,
-        deepseekApiKey: effectiveDeepseekKey,
       });
 
       res.status(200).json({
