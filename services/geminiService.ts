@@ -110,24 +110,109 @@ export async function testGeminiApiKey(apiKey: string): Promise<{
   }
 }
 
+// Robust JSON parser for AI outputs that repairs markdown fences, control characters, truncated JSON, or extracts vital fields via regex
+function safeParseGeminiJson(rawText: string): Record<string, any> {
+  if (!rawText || !rawText.trim()) {
+    throw new Error("ไม่ได้รับข้อมูลจาก AI กรุณาลองใหม่อีกครั้ง");
+  }
+
+  let text = rawText.trim();
+
+  // Strip markdown code fences anywhere in text
+  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // 1. Direct JSON parse
+  try {
+    return JSON.parse(text);
+  } catch (err1) {
+    // 2. Extract between first { and last }
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      const candidate = text.slice(firstBrace, lastBrace + 1);
+      try {
+        return JSON.parse(candidate);
+      } catch (err2) {
+        // 3. Fix unescaped control chars / newlines in JSON strings
+        try {
+          const sanitized = candidate.replace(/[\u0000-\u001F]+/g, (match) => {
+            if (match === '\n') return '\\n';
+            if (match === '\r') return '\\r';
+            if (match === '\t') return '\\t';
+            return '';
+          });
+          return JSON.parse(sanitized);
+        } catch {}
+      }
+    }
+
+    // 4. Repair truncated JSON if cut off at the end
+    try {
+      let repaired = text;
+      if (firstBrace !== -1) repaired = text.slice(firstBrace);
+      let inString = false;
+      let escaped = false;
+      for (let i = 0; i < repaired.length; i++) {
+        const char = repaired[i];
+        if (char === '\\' && !escaped) {
+          escaped = true;
+          continue;
+        }
+        if (char === '"' && !escaped) {
+          inString = !inString;
+        }
+        escaped = false;
+      }
+      if (inString) repaired += '"';
+      const openBraces = (repaired.match(/\{/g) || []).length;
+      const closeBraces = (repaired.match(/\}/g) || []).length;
+      if (openBraces > closeBraces) repaired += '}'.repeat(openBraces - closeBraces);
+      return JSON.parse(repaired);
+    } catch {}
+
+    // 5. Regex extraction fallback (guarantees we extract title, content, stylePrompt)
+    const titleMatch = text.match(/"title"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+    const stylePromptMatch = text.match(/"stylePrompt"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+    const excludeStylesMatch = text.match(/"excludeStyles"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+
+    let contentVal = '';
+    const contentMatch = text.match(/"content"\s*:\s*"([\s\S]*?)(?:",\s*"\w+"|\s*"\s*\}|$)/);
+    if (contentMatch) {
+      contentVal = contentMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+    }
+
+    if (contentVal || titleMatch) {
+      return {
+        title: titleMatch ? titleMatch[1] : 'บทเพลงใหม่ของคุณ',
+        content: contentVal || text,
+        stylePrompt: stylePromptMatch ? stylePromptMatch[1] : '',
+        excludeStyles: excludeStylesMatch ? excludeStylesMatch[1] : '',
+      };
+    }
+
+    throw new Error("AI ตอบกลับในรูปแบบที่ไม่สมบูรณ์ กรุณากดสร้างใหม่อีกครั้ง");
+  }
+}
+
 async function callGeminiDirect(
   promptText: string,
   apiKey: string
 ): Promise<{ text: string; engineUsed: string; fallbackApplied: boolean; fallbackReason?: string }> {
   const cleanKey = apiKey.trim();
-  // Primary model is Gemini 3.8 Flash; Backup is Gemini 3.5 Flash; with Flash Lite fallbacks
+  // Primary model is Gemini 3.8 Flash; Backup is Gemini 3.5 Flash; with Flash Lite fail-safes
   const models = [
-    { name: 'gemini-3.8-flash', isPrimary: true, timeout: 50000 },
-    { name: 'gemini-3.5-flash', isPrimary: false, timeout: 50000 },
-    { name: 'gemini-3.5-flash-lite', isPrimary: false, timeout: 40000 },
-    { name: 'gemini-flash-lite-latest', isPrimary: false, timeout: 35000 }
+    { name: 'gemini-3.8-flash', isPrimary: true, timeout: 25000 },
+    { name: 'gemini-3.5-flash', isPrimary: false, timeout: 20000 },
+    { name: 'gemini-3.1-flash-lite', isPrimary: false, timeout: 20000 },
+    { name: 'gemini-flash-lite-latest', isPrimary: false, timeout: 20000 },
+    { name: 'gemini-3.5-flash-lite', isPrimary: false, timeout: 20000 }
   ];
 
   let lastErr: any = null;
   let primaryFailReason: string | undefined;
 
   for (const m of models) {
-    for (let attempt = 0; attempt <= 1; attempt++) {
+    for (let attempt = 0; attempt <= (m.isPrimary ? 1 : 0); attempt++) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${m.name}:generateContent?key=${encodeURIComponent(cleanKey)}`;
         const res = await fetch(url, {
@@ -140,7 +225,7 @@ async function callGeminiDirect(
             contents: [{ parts: [{ text: promptText }] }],
             generationConfig: {
               responseMimeType: 'application/json',
-              maxOutputTokens: 8192,
+              maxOutputTokens: 16384,
             },
           }),
           signal: AbortSignal.timeout(m.timeout),
@@ -155,22 +240,21 @@ async function callGeminiDirect(
               engineUsed: m.name,
               fallbackApplied: !m.isPrimary,
               fallbackReason: !m.isPrimary
-                ? `Gemini 3.8 Flash มีผู้ใช้งานหนาแน่น (${primaryFailReason || '503/Timeout'}) จึงสลับใช้ ${m.name} สำรองให้อัตโนมัติ`
+                ? `Gemini 3.8 Flash โควต้าเต็มหรือมีผู้ใช้งานหนาแน่น (${primaryFailReason || '429/503'}) จึงสลับใช้ ${m.name} สำรองให้อัตโนมัติ`
                 : undefined,
             };
           }
         } else {
           const errJson = await res.json().catch(() => ({}));
           const errMsg = errJson?.error?.message || res.statusText;
-          if (res.status === 503 && attempt === 0) {
-            console.warn(`[GeminiDirect] Model ${m.name} got 503, retrying in 1.2s...`);
-            await new Promise((r) => setTimeout(r, 1200));
-            continue;
-          }
           console.warn(`[GeminiDirect] Model ${m.name} returned ${res.status}:`, errMsg);
           lastErr = new Error(`Gemini ${m.name} (${res.status}): ${errMsg}`);
           if (m.isPrimary) {
             primaryFailReason = `${res.status} ${errMsg}`;
+          }
+          // On 429 (quota) or 503 (high demand), immediately proceed to next backup model without wasting time
+          if (res.status === 429 || res.status === 503) {
+            break;
           }
         }
       } catch (e: any) {
@@ -179,7 +263,7 @@ async function callGeminiDirect(
         if (m.isPrimary) {
           primaryFailReason = e?.message || String(e);
         }
-        if (attempt === 0) {
+        if (attempt === 0 && m.isPrimary) {
           await new Promise((r) => setTimeout(r, 1000));
           continue;
         }
@@ -274,31 +358,7 @@ export const generateThaiLyrics = async (input: SongInput): Promise<{
       }
     }
 
-    let text: string = data.text || '';
-    if (!text.trim()) throw new Error("ไม่ได้รับข้อมูลจาก AI กรุณาลองใหม่อีกครั้ง");
-
-    text = text.trim();
-    if (text.startsWith('```json')) {
-      text = text.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    } else if (text.startsWith('```')) {
-      text = text.replace(/^```\s*/, '').replace(/\s*```$/, '');
-    }
-
-    let parsed: Record<string, any>;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          parsed = JSON.parse(jsonMatch[0]);
-        } catch {
-          throw new Error("AI ตอบกลับในรูปแบบที่ไม่สมบูรณ์ กรุณากดสร้างใหม่อีกครั้ง");
-        }
-      } else {
-        throw new Error("AI ตอบกลับในรูปแบบที่ไม่สมบูรณ์ กรุณากดสร้างใหม่อีกครั้ง");
-      }
-    }
+    const parsed: Record<string, any> = safeParseGeminiJson(data.text || '');
 
     // Priority 1: Keep user-specified title if provided, else use AI title
     const songTitle = (normalizedInput.title && normalizedInput.title.trim())
